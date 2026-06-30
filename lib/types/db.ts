@@ -115,16 +115,16 @@ export interface EmployeeRow extends Timestamped {
   id: Uuid;
   function_id: Uuid;
   user_id: Uuid | null;
-  display_name: string;
+  name: string;
+  designation: string | null;
   email: string | null;
   github_handle: string | null;
   /** Claude Code account uuid (nullable — the OTEL/BYO path leaves it null). */
-  account_uuid: string | null;
+  claude_account_uuid: string | null;
   attribution_mode: AttributionMode;
-  /** matched/unmatched onboarding status, set by provisioning. */
-  is_matched: boolean;
+  /** onboarding status, set by provisioning. */
+  match_status: 'linked' | 'byo' | 'unmatched';
   is_demo: boolean;
-  manager_id: Uuid | null;
   active: boolean;
 }
 
@@ -136,22 +136,20 @@ export interface EmployeeRoleRow {
 }
 
 /** index_config — versioned weights/anchors/sizing (append-only, the only seed). */
-export interface IndexConfigRow {
+export interface IndexConfigRow extends Timestamped {
   id: Uuid;
-  config_version: string;
-  /** jsonb: DimensionWeights. */
-  weights: Record<Dimension, number>;
+  function_id: Uuid;
+  version: number;
+  /** jsonb: DimensionWeights {usage, efficiency, effectiveness, proficiency}. */
+  weights_jsonb: Record<Dimension, number>;
   /** jsonb: per-KPI normalization anchors. */
-  anchors: Record<string, { floor?: number; target: number; ceil?: number }>;
-  /** jsonb: sizing knobs. */
-  sizing: {
-    modulesWeight: number;
-    blastWeight: number;
-    coldStart: { sMax: number; lMin: number };
-    tieBreakBand: number;
-  };
-  is_active: boolean;
-  created_at: Timestamp;
+  anchors_jsonb: Record<string, { floor?: number; target: number; ceil?: number; inverted?: boolean }>;
+  /** jsonb: sizing knobs (size_score weights + S/M/L tertile thresholds). */
+  sizing_jsonb: Record<string, unknown>;
+  ignore_globs: string[];
+  sensitive_globs: string[];
+  /** non-null once frozen → immutable (a change appends a new version). */
+  frozen_at: Timestamp | null;
 }
 
 /** connectors — per-function connector config + health. */
@@ -161,8 +159,8 @@ export interface ConnectorRow extends Timestamped {
   type: ConnectorType;
   status: ConnectorStatus;
   /** jsonb: non-secret connector settings (repo name, install id, etc.). */
-  config: Record<string, unknown>;
-  last_synced_at: Timestamp | null;
+  config_jsonb: Record<string, unknown>;
+  last_sync_at: Timestamp | null;
   last_error: string | null;
 }
 
@@ -282,10 +280,14 @@ export interface KpiDailyRow {
   scope: Scope;
   scope_id: Uuid;
   kpi_id: KpiId;
+  function_id: Uuid;
   raw_value: number | null;
   norm_score: number | null;
-  confidence: number;
-  config_version: string;
+  /** the confidence_band enum (not a number). */
+  confidence: ConfidenceBand;
+  signal_count: number;
+  config_version: number | null;
+  computed_at: Timestamp;
 }
 
 /** index_daily — the L1/L2 result per (date, scope, scope_id). */
@@ -293,16 +295,18 @@ export interface IndexDailyRow {
   date: DateString;
   scope: Scope;
   scope_id: Uuid;
+  function_id: Uuid;
   l1: number | null;
   l2_usage: number | null;
   l2_eff: number | null;
   l2_effness: number | null;
   l2_prof: number | null;
-  band: Band;
-  confidence: number;
-  confidence_band: ConfidenceBand;
+  band: Band | null;
+  /** the confidence_band enum (the only confidence column). */
+  confidence: ConfidenceBand;
   tokens_per_pr: number | null;
-  config_version: string;
+  config_version: number;
+  computed_at: Timestamp;
 }
 
 // ---------------------------------------------------------------------------
@@ -312,50 +316,55 @@ export interface IndexDailyRow {
 /** insights — agent-authored narrative (numbers come from scoring, never the LLM). */
 export interface InsightRow {
   id: Uuid;
+  function_id: Uuid;
   date: DateString;
   scope: Scope;
   scope_id: Uuid;
-  kind: 'improvement_area' | 'change_governance' | 'pr_level' | 'improvement_attribution';
-  title: string;
-  body: string;
-  dimension: Dimension | null;
+  kind: 'improvement' | 'change' | 'pr_level' | 'attribution';
+  rank: number;
+  title: string | null;
+  body: string | null;
+  dimension: string | null;
   /** est_impact computed in code; the agent only narrates it. */
   est_impact: number | null;
-  /** evidence ids the narrative is grounded against. */
-  evidence_refs: string[];
-  config_version: string;
+  pr_id: Uuid | null;
+  /** jsonb: evidence the narrative is grounded against. */
+  evidence_jsonb: Record<string, unknown>;
   created_at: Timestamp;
 }
 
-/** recommendations — deterministic rule output with evidence deltas. */
-export interface RecommendationRow {
+/** recommendations — deterministic rule output. title/body are DERIVED in the
+ *  read layer (title=ref, body=rationale); there are no title/body/dimension columns. */
+export interface RecommendationRow extends Timestamped {
   id: Uuid;
+  function_id: Uuid;
   employee_id: Uuid;
+  date: DateString;
   kind: RecKind;
-  status: RecStatus;
-  title: string;
-  body: string;
-  dimension: Dimension | null;
-  /** the (member, kind, ref) uniqueness key for one open rec. */
+  /** the skill name / process id / course id — the (member, kind, ref) open-rec key. */
   ref: string;
+  rationale: string | null;
+  status: RecStatus;
+  detected_via: string | null;
   /** jsonb: the evidence delta that triggered the rec. */
-  evidence: Record<string, unknown>;
-  created_at: Timestamp;
-  updated_at: Timestamp;
+  evidence_jsonb: Record<string, unknown>;
 }
 
 /** courses — assignment + Prism-owned completion (knowledge_check_passed_at). */
-export interface CourseRow {
+export interface CourseRow extends Timestamped {
   id: Uuid;
+  function_id: Uuid;
   employee_id: Uuid;
-  /** ALS course slug. */
-  slug: string;
-  title: string;
-  dimension: Dimension | null;
-  status: CourseStatus;
+  dimension: string | null;
+  /** ALS course id (studio slug). */
+  course_id: string;
+  title: string | null;
+  url: string | null;
   /** the ALS-user↔employee link persisted at assignment. */
-  als_user_id: string | null;
-  assigned_at: Timestamp;
+  als_user_ref: string | null;
+  due_at: Timestamp | null;
+  progress_pct: number;
+  status: CourseStatus;
   /** non-null only when all lessons' knowledge checks pass (completion signal). */
   knowledge_check_passed_at: Timestamp | null;
 }
@@ -363,13 +372,14 @@ export interface CourseRow {
 /** comms_log — digest delivery/open events. */
 export interface CommsLogRow {
   id: Uuid;
+  function_id: Uuid;
   employee_id: Uuid;
+  date: DateString;
   channel: CommsChannel;
-  subject: string;
+  payload_html: string | null;
   sent_at: Timestamp | null;
-  delivered_at: Timestamp | null;
   opened_at: Timestamp | null;
-  provider_message_id: string | null;
+  created_at: Timestamp;
 }
 
 // ---------------------------------------------------------------------------

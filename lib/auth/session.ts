@@ -77,7 +77,7 @@ export async function getEmployeeForUid(uid: string, email: string | null): Prom
   // employees is keyed to auth.users via user_id. RLS lets a user read their own row.
   const { data: employee } = await db
     .from('employees')
-    .select('id, function_id, display_name, email, is_demo')
+    .select('id, function_id, name, email, is_demo')
     .eq('user_id', uid)
     .maybeSingle();
 
@@ -88,7 +88,7 @@ export async function getEmployeeForUid(uid: string, email: string | null): Prom
   const emp = employee as {
     id: string;
     function_id: string;
-    display_name: string;
+    name: string;
     email: string | null;
     is_demo: boolean;
   };
@@ -101,7 +101,7 @@ export async function getEmployeeForUid(uid: string, email: string | null): Prom
     userId: uid,
     employeeId: emp.id,
     functionId: emp.function_id,
-    displayName: emp.display_name,
+    displayName: emp.name,
     email: emp.email ?? email,
     roles: roles.length > 0 ? roles : ['developer'],
     isDemo: emp.is_demo,

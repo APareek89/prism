@@ -5,7 +5,7 @@ review pass found. **One owner, one location** for each shared concern. Read bef
 
 | Concern | Single owner | Notes |
 |---|---|---|
-| **Supabase migrations** | `supabase/migrations/0001–0021` (data layer) | Automation appends **net-new** tables at `0030+` only. Never redefine employees / attribution / RLS / indexes elsewhere. |
+| **Supabase migrations** | `supabase/migrations/0001–0021` (data layer) | Automation appends **net-new** at `0030+`. `0030` = insights `attribution` kind (applied). M4 pipeline_runs/comms_outbox/RLS → `0031+`. Never redefine employees / attribution / RLS / indexes elsewhere. |
 | **Supabase clients** | `lib/supabase/{server,admin,browser}.ts` | `server` = RLS (RSC/API) · `admin` = service-role (pipeline/webhook/onboarding only) · `browser` = anon. No other client modules. |
 | **Generated DB types** | `lib/types/database.generated.ts` | Re-exported by `lib/db`. Regenerated via `npm run db:types`. |
 | **Auth resolution** | `lib/auth/session.ts` | The one JWT→employee→roles resolver (+ DEMO_MODE bypass). No `getAuthContext`/`getCurrentEmployee` duplicates. |
