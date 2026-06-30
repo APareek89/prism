@@ -233,7 +233,10 @@ export async function runPipeline(args: RunPipelineArgs): Promise<PipelineSummar
   });
 
   return {
-    ok: errors.length === 0,
+    // "ok" = every step ran without throwing. Optional-connector soft warnings
+    // (e.g. GitHub not installed yet, Sentry not configured) are collected in
+    // `errors` as non-fatal notes and do NOT mark the run failed.
+    ok: steps.every((s) => s.ok),
     functionId,
     date,
     membersScored: result.members.length,
