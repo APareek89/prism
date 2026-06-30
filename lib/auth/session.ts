@@ -12,6 +12,7 @@
 import { isConfigured } from '@/lib/config/env';
 import { isDemoMode } from '@/lib/config/flags';
 import { appTable, createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { AppRole, AuthUser } from '@/lib/types';
 
 /** The synthetic demo identity used for keyless boot (no DB, no session). */
@@ -32,6 +33,50 @@ export function demoUser(): AuthUser {
 }
 
 /**
+ * The demo identity bound to the REAL `is_demo` "self" employee row (created by the
+ * pipeline/onboarding), so the demo session keys off the actual scored data (My view,
+ * function aggregates, connector status) instead of the synthetic placeholder ids.
+ * Uses the service-role client because the is_demo row has no `user_id` (RLS can't
+ * resolve it without a session). Falls back to the synthetic demo user if Supabase is
+ * unavailable or no self employee exists yet (keyless boot stays safe).
+ */
+async function demoUserFromDb(): Promise<AuthUser> {
+  if (!isConfigured('supabase')) return demoUser();
+  try {
+    const admin = createAdminClient() as unknown as {
+      from: (t: string) => {
+        select: (c: string) => {
+          eq: (
+            k: string,
+            v: unknown,
+          ) => {
+            limit: (n: number) => { maybeSingle: () => Promise<{ data: Record<string, unknown> | null }> };
+          };
+        };
+      };
+    };
+    const { data } = await admin
+      .from('employees')
+      .select('id, function_id, name, email')
+      .eq('is_demo', true)
+      .limit(1)
+      .maybeSingle();
+    if (!data) return demoUser();
+    return {
+      userId: 'demo-user',
+      employeeId: data.id as string,
+      functionId: data.function_id as string,
+      displayName: (data.name as string | null) ?? 'You',
+      email: (data.email as string | null) ?? null,
+      roles: ['developer', 'manager', 'function_lead', 'admin'],
+      isDemo: true,
+    };
+  } catch {
+    return demoUser();
+  }
+}
+
+/**
  * Resolve the current AuthUser, or null when unauthenticated (and not in a demo
  * fallback). Never throws on a missing key — returns the demo user instead so views
  * render keyless.
@@ -48,9 +93,9 @@ export async function getAuthUser(): Promise<AuthUser | null> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    // No live session. In DEMO_MODE, fall back to the demo identity so the dev loop
-    // isn't a magic-link wall; otherwise unauthenticated.
-    return isDemoMode() ? demoUser() : null;
+    // No live session. In DEMO_MODE, bind to the real is_demo employee so the dev loop
+    // isn't a magic-link wall and the views key off real data; otherwise unauthenticated.
+    return isDemoMode() ? await demoUserFromDb() : null;
   }
 
   return getEmployeeForUid(user.id, user.email ?? null);
@@ -82,7 +127,7 @@ export async function getEmployeeForUid(uid: string, email: string | null): Prom
     .maybeSingle();
 
   if (!employee) {
-    return isDemoMode() ? demoUser() : null;
+    return isDemoMode() ? await demoUserFromDb() : null;
   }
 
   const emp = employee as {
