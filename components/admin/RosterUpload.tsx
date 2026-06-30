@@ -4,10 +4,10 @@
 // the roster `table` mapping people to their data streams, with a `Match` column using
 // AttributionBadge. Faithful port of the design's `.upload` + `table` markup.
 //
-// Client component because it owns the file input (drop / click to select). Accepting
-// the CSV and POSTing it to the provisioning endpoint is deferred to M2 — for now the
-// chosen file's name is shown with an explicit "parsing deferred to M2" note, so the
-// affordance reads as real without fabricating a parse result.
+// Client component because it owns the file input (drop / click to select). On pick/drop
+// it POSTs the CSV (multipart `file`) to /api/connectors/employees/upload, which parses +
+// idempotently provisions every row; on success it calls router.refresh() so the match
+// table below re-renders with the freshly provisioned people.
 //
 // The table `rows` are real RosterMatchDTO[] fetched on the server and passed in; when
 // empty the table renders just its header (no fabricated people).
@@ -16,7 +16,8 @@
 
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import type { RosterMatchDTO } from '@/lib/ui/view-models';
 import { AttributionBadge } from './AttributionBadge';
 
@@ -26,15 +27,37 @@ export interface RosterUploadProps {
 
 export function RosterUpload({ rows }: RosterUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [fileName, setFileName] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ tone: 'busy' | 'ok' | 'err'; msg: string } | null>(null);
 
   function onPick() {
     inputRef.current?.click();
   }
 
-  function onFile(file: File | null) {
-    // Accept the file (capture its name) but do not parse — provisioning is M2.
+  async function onFile(file: File | null) {
     setFileName(file?.name ?? null);
+    if (!file) return;
+    setStatus({ tone: 'busy', msg: `Uploading ${file.name}…` });
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch('/api/connectors/employees/upload', { method: 'POST', body: form });
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok || data.ok === false) {
+        const errs = Array.isArray(data.errors) ? (data.errors as string[]).join('; ') : '';
+        setStatus({ tone: 'err', msg: String(data.error ?? errs ?? `upload failed (${res.status})`) });
+        return;
+      }
+      setStatus({
+        tone: 'ok',
+        msg: `provisioned ${data.provisioned ?? 0} (${data.created ?? 0} new, ${data.updated ?? 0} updated)`,
+      });
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setStatus({ tone: 'err', msg: e instanceof Error ? e.message : 'upload failed' });
+    }
   }
 
   return (
@@ -70,9 +93,16 @@ export function RosterUpload({ rows }: RosterUploadProps) {
         <span className="mono">
           columns: name, designation, github_handle, email, claude_account_uuid
         </span>
-        {fileName ? (
-          <span className="mono" style={{ color: 'var(--warn)', marginTop: 8 }}>
-            {fileName} selected — parsing deferred to M2
+        {status ? (
+          <span
+            className="mono"
+            style={{
+              color: status.tone === 'err' ? 'var(--warn)' : status.tone === 'ok' ? 'var(--good, #2e9e5b)' : 'var(--mut2)',
+              marginTop: 8,
+            }}
+          >
+            {fileName ? `${fileName} — ` : ''}
+            {status.msg}
           </span>
         ) : null}
       </div>

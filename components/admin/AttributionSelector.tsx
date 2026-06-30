@@ -4,14 +4,15 @@
 // the `.radio` selector for how unmatched telemetry streams are handled:
 //   Org workspace · BYO reimbursement · Hybrid (recommended)
 // Faithful port of the design's `.note` / `.radio` markup. Client component because the
-// selector is interactive; the selection is held in local state for now — persisting it
-// (writing the org's AttributionMode) is wired in M2. Defaults to "Hybrid".
+// selector is interactive. On mount it loads the persisted policy from
+// /api/connectors/attribution; selecting an option POSTs the new value (persisted on the
+// claude_code connector config). Defaults to "Hybrid".
 //
 // 'use client'
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Mode = 'org' | 'byo' | 'hybrid';
 
@@ -28,6 +29,49 @@ export interface AttributionSelectorProps {
 
 export function AttributionSelector({ defaultMode = 'hybrid' }: AttributionSelectorProps) {
   const [mode, setMode] = useState<Mode>(defaultMode);
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  // Load the persisted policy on mount (best-effort; falls back to the default).
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/connectors/attribution')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d && typeof d.mode === 'string') setMode(d.mode as Mode);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /** Persist a newly-selected mode (optimistic; reverts the note on failure). */
+  async function selectMode(next: Mode): Promise<void> {
+    const prev = mode;
+    setMode(next);
+    setSaving(true);
+    setNote(null);
+    try {
+      const res = await fetch('/api/connectors/attribution', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode: next }),
+      });
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok || data.ok === false) {
+        setMode(prev);
+        setNote(String(data.error ?? `save failed (${res.status})`));
+      } else {
+        setNote('saved');
+      }
+    } catch (e) {
+      setMode(prev);
+      setNote(e instanceof Error ? e.message : 'save failed');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="note">
@@ -50,12 +94,15 @@ export function AttributionSelector({ defaultMode = 'hybrid' }: AttributionSelec
               className={selected ? 'sel' : undefined}
               role="radio"
               aria-checked={selected}
+              aria-disabled={saving}
               tabIndex={0}
-              onClick={() => setMode(opt.value)}
+              onClick={() => {
+                if (!saving) void selectMode(opt.value);
+              }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  setMode(opt.value);
+                  if (!saving) void selectMode(opt.value);
                 }
               }}
             >
@@ -64,6 +111,14 @@ export function AttributionSelector({ defaultMode = 'hybrid' }: AttributionSelec
             </label>
           );
         })}
+        {note ? (
+          <span
+            className="mono"
+            style={{ fontSize: 10.5, color: note === 'saved' ? 'var(--good, #2e9e5b)' : 'var(--warn)', alignSelf: 'center' }}
+          >
+            {saving ? 'saving…' : note}
+          </span>
+        ) : null}
       </div>
     </div>
   );

@@ -83,7 +83,7 @@ export function AdminConnectors({ connectors }: AdminConnectorsProps) {
               }}
             >
               <span>{dto?.syncLabel ?? 'Awaiting first sync'}</span>
-              <RunPipelineButton connected={connected} />
+              <RunPipelineButton type={slot.type} connected={connected} />
             </div>
           </div>
         );
