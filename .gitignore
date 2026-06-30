@@ -12,6 +12,16 @@ out/
 # os
 .DS_Store
 
+# build / test
+coverage/
+.inngest/
+next-env.d.ts
+*.tsbuildinfo
+
+# supabase
+supabase/.branches/
+supabase/.temp/
+
 # misc
 *.log
 .vercel

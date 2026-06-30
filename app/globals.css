@@ -1,0 +1,106 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Prism design tokens — copied EXACTLY from prism_dashboard.html :root.
+   Dark instrument-panel aesthetic. "One light · four signals."
+   Components reference these vars; app/tokens.ts mirrors the hues for typed SVG.
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg: #0d111c;
+  --panel: #151b2b;
+  --panel2: #1a2236;
+  --line: #2a3348;
+  --line2: #363f57;
+  --ink: #eef1f7;
+  --mut: #8b95ac;
+  --mut2: #5f6a83;
+
+  /* dimension hues — use consistently everywhere */
+  --usage: #5b8def;
+  --eff: #2dd4bf;
+  --effness: #f5a524;
+  --prof: #a78bfa;
+
+  --good: #3ecf8e;
+  --bad: #f0616d;
+  --warn: #f5a524;
+
+  --disp: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --body: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--usage);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── shared primitives (components may add CSS modules on top) ── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.mono {
+  font-family: var(--mono);
+}
+.display {
+  font-family: var(--disp);
+}
+.muted {
+  color: var(--mut);
+}
+.muted2 {
+  color: var(--mut2);
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
