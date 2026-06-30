@@ -16,49 +16,49 @@
 
 -- ── functions: admins read + edit their function(s) ─────────────────────────
 create policy functions_admin_select on public.functions
-  for select to authenticated using ( auth.is_admin(id) );
+  for select to authenticated using ( public.is_admin(id) );
 create policy functions_admin_update on public.functions
-  for update to authenticated using ( auth.is_admin(id) ) with check ( auth.is_admin(id) );
+  for update to authenticated using ( public.is_admin(id) ) with check ( public.is_admin(id) );
 create policy functions_admin_insert on public.functions
-  for insert to authenticated with check ( auth.is_admin() );
+  for insert to authenticated with check ( public.is_admin() );
 
 -- ── employees (roster): admins full CRUD within functions they admin ────────
 create policy employees_admin_select on public.employees
-  for select to authenticated using ( auth.is_admin(function_id) );
+  for select to authenticated using ( public.is_admin(function_id) );
 create policy employees_admin_insert on public.employees
-  for insert to authenticated with check ( auth.is_admin(function_id) );
+  for insert to authenticated with check ( public.is_admin(function_id) );
 create policy employees_admin_update on public.employees
-  for update to authenticated using ( auth.is_admin(function_id) ) with check ( auth.is_admin(function_id) );
+  for update to authenticated using ( public.is_admin(function_id) ) with check ( public.is_admin(function_id) );
 create policy employees_admin_delete on public.employees
-  for delete to authenticated using ( auth.is_admin(function_id) );
+  for delete to authenticated using ( public.is_admin(function_id) );
 
 -- ── employee_roles: admins grant/revoke roles ───────────────────────────────
 create policy employee_roles_admin_select on public.employee_roles
-  for select to authenticated using ( auth.is_admin(function_id) );
+  for select to authenticated using ( public.is_admin(function_id) );
 create policy employee_roles_admin_insert on public.employee_roles
-  for insert to authenticated with check ( auth.is_admin(function_id) );
+  for insert to authenticated with check ( public.is_admin(function_id) );
 create policy employee_roles_admin_update on public.employee_roles
-  for update to authenticated using ( auth.is_admin(function_id) ) with check ( auth.is_admin(function_id) );
+  for update to authenticated using ( public.is_admin(function_id) ) with check ( public.is_admin(function_id) );
 create policy employee_roles_admin_delete on public.employee_roles
-  for delete to authenticated using ( auth.is_admin(function_id) );
+  for delete to authenticated using ( public.is_admin(function_id) );
 
 -- ── connectors: admins wire data sources ────────────────────────────────────
 create policy connectors_admin_select on public.connectors
-  for select to authenticated using ( auth.is_admin(function_id) );
+  for select to authenticated using ( public.is_admin(function_id) );
 create policy connectors_admin_insert on public.connectors
-  for insert to authenticated with check ( auth.is_admin(function_id) );
+  for insert to authenticated with check ( public.is_admin(function_id) );
 create policy connectors_admin_update on public.connectors
-  for update to authenticated using ( auth.is_admin(function_id) ) with check ( auth.is_admin(function_id) );
+  for update to authenticated using ( public.is_admin(function_id) ) with check ( public.is_admin(function_id) );
 create policy connectors_admin_delete on public.connectors
-  for delete to authenticated using ( auth.is_admin(function_id) );
+  for delete to authenticated using ( public.is_admin(function_id) );
 
 -- ── index_config: admins read all + APPEND a new version (no in-place edit of
 -- frozen weights/anchors — enforced by the 0020 freeze trigger) ──────────────
 create policy index_config_admin_select on public.index_config
-  for select to authenticated using ( auth.is_admin(function_id) );
+  for select to authenticated using ( public.is_admin(function_id) );
 create policy index_config_admin_insert on public.index_config
-  for insert to authenticated with check ( auth.is_admin(function_id) );
+  for insert to authenticated with check ( public.is_admin(function_id) );
 -- UPDATE is permitted by RLS only to allow setting frozen_at / non-frozen edits;
 -- the freeze trigger rejects changes to weights/anchors after frozen_at is set.
 create policy index_config_admin_update on public.index_config
-  for update to authenticated using ( auth.is_admin(function_id) ) with check ( auth.is_admin(function_id) );
+  for update to authenticated using ( public.is_admin(function_id) ) with check ( public.is_admin(function_id) );
