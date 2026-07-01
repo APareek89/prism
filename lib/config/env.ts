@@ -15,6 +15,17 @@ import { z } from 'zod';
 // Schemas
 // ---------------------------------------------------------------------------
 
+/**
+ * An OPTIONAL secret that must be either genuinely absent OR non-empty. A BLANK string
+ * (the natural "turn this off" edit, and how the .env template ships unset keys) is
+ * coerced to `undefined` BEFORE validation, so `''` reads as "not configured" instead of
+ * throwing "String must contain at least 1 character(s)" for every server-env reader.
+ * This keeps the keyless-boot promise ("optional keys never throw") true even when a key
+ * is present-but-blank — the exact case that otherwise crashes `next build`.
+ */
+const optionalSecret = () =>
+  z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional());
+
 /** Public vars are inlined by Next at build; safe to read eagerly but kept lazy
  *  for symmetry. None are "required" for the build to succeed. */
 const publicSchema = z.object({
@@ -40,11 +51,13 @@ const serverSchema = z.object({
   // Supabase (the only "required when used" group)
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  SUPABASE_SERVICE_ROLE_KEY: optionalSecret(),
   SUPABASE_DB_URL: z.string().optional(),
 
-  // Anthropic (M4)
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  // Anthropic (M4). optionalSecret ⇒ a blank ANTHROPIC_API_KEY reads as "not configured"
+  // (mock-model path) instead of throwing — keeps the keyless build/boot green when the
+  // agent key is turned off by blanking it, not just by removing the line.
+  ANTHROPIC_API_KEY: optionalSecret(),
   LLM_PROVIDER: z.string().default('anthropic'),
   ANTHROPIC_MODEL: z.string().optional(),
   ANTHROPIC_CLASSIFIER_MODEL: z.string().optional(),
@@ -67,6 +80,10 @@ const serverSchema = z.object({
   // Email (M4)
   RESEND_API_KEY: z.string().optional(),
   DIGEST_FROM_EMAIL: z.string().optional(),
+  // Svix signing secret for the Resend open/delivery webhook (starts with "whsec_").
+  // Optional + keyless-safe: absent ⇒ the webhook rejects unsigned callbacks (200,
+  // no patch) rather than trusting them.
+  RESEND_WEBHOOK_SECRET: z.string().optional(),
 
   // Inngest (M4)
   INNGEST_EVENT_KEY: z.string().optional(),
@@ -74,6 +91,9 @@ const serverSchema = z.object({
 
   // Learning studio (M4)
   LEARNING_STUDIO_BASE_URL: z.string().optional(),
+  // Optional bearer token for the studio's auth-gated reads (GET /api/course/:id).
+  // Blank in demo; when absent Prism only reaches the studio's public endpoints.
+  LEARNING_STUDIO_TOKEN: z.string().optional(),
 });
 
 export type PublicEnv = z.infer<typeof publicSchema>;

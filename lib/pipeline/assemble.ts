@@ -24,7 +24,14 @@ import type {
   SkillAuthorshipRow,
 } from '@/lib/scoring/types';
 import type { RawIndexConfig } from '@/lib/scoring/config';
-import { DEFAULT_INDEX_CONFIG } from '@/lib/scoring/defaults/index-config.default';
+import {
+  derivePrSignals,
+  type BlameSignalInput,
+  type CommitSignalInput,
+  type DerivedPrSignals,
+  type PrSignalInput,
+} from './pr-signals';
+import { reconcileStoredConfig } from './config-reconcile';
 
 const DAY_MS = 86_400_000;
 const REVERT_WINDOW_MS = 14 * DAY_MS;
@@ -148,6 +155,10 @@ export async function listActiveEmployees(functionId: string): Promise<ActiveEmp
 interface PrDbRow {
   id: string;
   employee_id: string | null;
+  repo: unknown;
+  author_handle: unknown;
+  additions: unknown;
+  merge_sha: unknown;
   files: unknown;
   hunks: unknown;
   modules: unknown;
@@ -160,6 +171,11 @@ interface PrDbRow {
   feature_label: unknown;
 }
 
+/** The gh_prs columns every reader selects (kept in one place so the per-PR signal
+ *  join and sizing read the same shape). Validated live (limit 0). */
+const PR_COLS =
+  'id, employee_id, repo, author_handle, additions, merge_sha, files, hunks, modules, blast, is_merged, ai_assisted, merged_at, created_at, reverted_at, feature_label';
+
 /** Merged-or-created-in-window PRs for the function. (28d compute window.) */
 async function loadWindowPrs(functionId: string, b: Bounds): Promise<PrDbRow[]> {
   const db = looseDb();
@@ -168,9 +184,7 @@ async function loadWindowPrs(functionId: string, b: Bounds): Promise<PrDbRow[]> 
   const byMerged = rows(
     await db
       .from('gh_prs')
-      .select(
-        'id, employee_id, files, hunks, modules, blast, is_merged, ai_assisted, merged_at, created_at, reverted_at, feature_label',
-      )
+      .select(PR_COLS)
       .eq('function_id', functionId)
       .gte('merged_at', b.computeSince)
       .lte('merged_at', b.until),
@@ -178,9 +192,7 @@ async function loadWindowPrs(functionId: string, b: Bounds): Promise<PrDbRow[]> 
   const byCreated = rows(
     await db
       .from('gh_prs')
-      .select(
-        'id, employee_id, files, hunks, modules, blast, is_merged, ai_assisted, merged_at, created_at, reverted_at, feature_label',
-      )
+      .select(PR_COLS)
       .eq('function_id', functionId)
       .gte('created_at', b.computeSince)
       .lte('created_at', b.until),
@@ -196,7 +208,7 @@ async function loadSizingPrs(functionId: string, b: Bounds): Promise<PrDbRow[]> 
   return rows(
     await db
       .from('gh_prs')
-      .select('id, employee_id, files, hunks, modules, blast, is_merged, ai_assisted, merged_at, created_at, reverted_at, feature_label')
+      .select(PR_COLS)
       .eq('function_id', functionId)
       .eq('is_merged', true)
       .gte('merged_at', b.sizingSince)
@@ -237,6 +249,7 @@ async function loadWindowSessions(functionId: string, b: Bounds): Promise<Sessio
 
 interface DeployDbRow {
   id: string;
+  sha: unknown;
   ai_assisted: unknown;
   change_failed: unknown;
   ts: unknown;
@@ -248,7 +261,7 @@ async function loadWindowDeploys(functionId: string, b: Bounds): Promise<DeployD
   return rows(
     await db
       .from('deploys')
-      .select('id, ai_assisted, change_failed, ts, function_id')
+      .select('id, sha, ai_assisted, change_failed, ts, function_id')
       .eq('function_id', functionId)
       .gte('ts', b.computeSince)
       .lte('ts', b.until),
@@ -258,18 +271,21 @@ async function loadWindowDeploys(functionId: string, b: Bounds): Promise<DeployD
 interface BlameDbRow {
   employee_id: string | null;
   author_handle: string | null;
+  repo: unknown;
   ai_assisted: unknown;
   alive_at_30d: unknown;
   first_seen: unknown;
 }
 
-/** AI-attributed blame lines first seen in the window (retention/rework signal). */
+/** AI-attributed blame lines first seen in the window (retention/rework signal).
+ *  Read across the 90d sizing window so 30d-retention has room; the per-PR
+ *  attribution (pr-signals) restricts to the author's merged PRs. */
 async function loadWindowBlame(functionId: string, b: Bounds): Promise<BlameDbRow[]> {
   const db = looseDb();
   return rows(
     await db
       .from('blame_snapshots')
-      .select('employee_id, author_handle, ai_assisted, alive_at_30d, first_seen, function_id')
+      .select('employee_id, author_handle, repo, ai_assisted, alive_at_30d, first_seen, function_id')
       .eq('function_id', functionId)
       .eq('ai_assisted', true)
       .gte('first_seen', b.sizingSince)
@@ -278,26 +294,77 @@ async function loadWindowBlame(functionId: string, b: Bounds): Promise<BlameDbRo
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// gh_commits + pr_ai_link readers (per-PR signal joins — validated live)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface CommitDbRow {
+  pr_id: string | null;
+  repo: unknown;
+  author_handle: string | null;
+  ts: unknown;
+  ai_assisted: unknown;
+}
+
+/** Commits whose ts lands in the 28d compute window (agentic-majority + rework +
+ *  self-revert detectors). Function-scoped. */
+async function loadWindowCommits(functionId: string, b: Bounds): Promise<CommitDbRow[]> {
+  const db = looseDb();
+  return rows(
+    await db
+      .from('gh_commits')
+      .select('pr_id, repo, author_handle, ts, ai_assisted, function_id')
+      .eq('function_id', functionId)
+      .gte('ts', b.computeSince)
+      .lte('ts', b.until),
+  ) as unknown as CommitDbRow[];
+}
+
+interface PrAiLinkDbRow {
+  pr_id: string | null;
+}
+
+/** All pr_ai_link rows for the function → the set of PR ids with a confirmed AI link
+ *  (drives `aiLinked`, OR'd with gh_prs.ai_assisted). Function-scoped; no window
+ *  filter (a link is a stable association, cheap to read whole for one function). */
+async function loadPrAiLinks(functionId: string): Promise<PrAiLinkDbRow[]> {
+  const db = looseDb();
+  return rows(
+    await db
+      .from('pr_ai_link')
+      .select('pr_id, function_id')
+      .eq('function_id', functionId),
+  ) as unknown as PrAiLinkDbRow[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Row mappers (DB columns → scoring input types — EXACT shapes from lib/scoring/types)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Map one gh_prs row → the scoring `PrRow`. The connector stores files/hunks/modules
- * (RAW; sizing re-derives S/M/L), blast (>0 ⇒ 1), is_merged, ai_assisted (the link
- * step sets this — it IS aiLinked), reverted_at, feature_label.
+ * (RAW; sizing re-derives S/M/L), blast (>0 ⇒ 1), is_merged, ai_assisted, reverted_at,
+ * feature_label. The per-PR Effectiveness/agentic signals that have no single column
+ * (aiLinesMerged/aiLinesAliveAt30d, agenticMajority, defectReworkWithin14d,
+ * isSelfRevert, and the confirmed aiLinked) are derived in pr-signals.ts from the
+ * joined gh_commits / pr_ai_link / blame_snapshots rows and passed in via `derived`.
  *
- * Per-PR AI-line retention (`aiLinesMerged`/`aiLinesAliveAt30d`), `agenticMajority`,
- * `defectReworkWithin14d`, and `isSelfRevert` have NO per-PR column in the current
- * schema (blame_snapshots is keyed per line, not per PR; agentic/self-revert/rework
- * detectors are M3). They map to honest no-signal defaults (0 / false) so the scoring
- * engine reports "no signal" rather than a fabricated number.
+ * `aiLinked` is the OR of the confirmed pr_ai_link (derived.aiLinked) and the
+ * connector's own gh_prs.ai_assisted flag — either evidence path lights the signal.
+ * When `derived` is absent (e.g. the 90d sizing PRs, where per-PR signals are unused —
+ * sizing only reads files/hunks/modules/blast) every derived signal is the honest
+ * no-signal default, exactly as before.
  */
-function mapPr(r: PrDbRow): PrRow {
+function mapPr(r: PrDbRow, derived?: DerivedPrSignals): PrRow {
   const isMerged = bool(r.is_merged);
   const mergedMs = ms(r.merged_at);
   const revertedMs = ms(r.reverted_at);
-  const revertedWithin14d =
-    revertedMs !== null && mergedMs !== null && revertedMs - mergedMs <= REVERT_WINDOW_MS;
+  // Fallback revert flag when no derived map is supplied (sizing PRs).
+  const revertedWithin14dFallback =
+    revertedMs !== null &&
+    mergedMs !== null &&
+    revertedMs >= mergedMs &&
+    revertedMs - mergedMs <= REVERT_WINDOW_MS;
+
   return {
     prId: String(r.id),
     files: num(r.files),
@@ -305,14 +372,28 @@ function mapPr(r: PrDbRow): PrRow {
     modules: num(r.modules),
     blast: num(r.blast) > 0 ? 1 : 0,
     isMerged,
-    aiLinked: bool(r.ai_assisted),
-    revertedWithin14d,
-    aiLinesMerged: 0, // per-PR blame attribution is M3 — no signal here, not fabricated
-    aiLinesAliveAt30d: 0,
-    agenticMajority: false, // accepted-hunk authorship detector is M3
-    defectReworkWithin14d: false, // fix-follow-up-on-same-hunks detector is M3
-    isSelfRevert: false, // self-revert detector is M3
+    aiLinked: (derived?.aiLinked ?? false) || bool(r.ai_assisted),
+    revertedWithin14d: derived?.revertedWithin14d ?? revertedWithin14dFallback,
+    aiLinesMerged: derived?.aiLinesMerged ?? 0,
+    aiLinesAliveAt30d: derived?.aiLinesAliveAt30d ?? 0,
+    agenticMajority: derived?.agenticMajority ?? false,
+    defectReworkWithin14d: derived?.defectReworkWithin14d ?? false,
+    isSelfRevert: derived?.isSelfRevert ?? false,
     hasFeatureLabel: str(r.feature_label) !== null,
+  };
+}
+
+/** Build the `PrSignalInput` view pr-signals.ts consumes from a gh_prs db row. */
+function toPrSignalInput(r: PrDbRow): PrSignalInput {
+  return {
+    prId: String(r.id),
+    employeeId: str(r.employee_id),
+    authorHandle: str(r.author_handle),
+    repo: str(r.repo),
+    additions: num(r.additions),
+    isMerged: bool(r.is_merged),
+    mergedMs: ms(r.merged_at),
+    revertedMs: ms(r.reverted_at),
   };
 }
 
@@ -380,58 +461,38 @@ function workingDaysFor(prs: PrDbRow[], sessions: SessionDbRow[]): number {
 
 /**
  * Load the active (highest-version) index_config for the function and translate it
- * into the scoring `RawIndexConfig` arg.
+ * into the scoring `RawIndexConfig` arg via `reconcileStoredConfig`.
  *
- * IMPORTANT (config-shape mismatch, verified against migration 0021): the stored
- * `weights_jsonb` matches the scoring weights shape, but `anchors_jsonb` uses
- * NON-canonical KPI keys (e.g. `iterations_to_merge`, `suggestion_acceptance`,
- * `skill_file_leverage`) plus an `inverted` field the strict scoring schema rejects,
- * and `sizing_jsonb` is DB-shaped (`{weights,thresholds,...}`) not scoring-shaped
- * (`{modulesWeight,blastWeight,coldStart,tieBreakBand}`). Passing that raw jsonb
- * straight through would THROW in resolveScoringConfig.
- *
- * So we keep the canonical default anchors + sizing (the v1 seed IS the default), use
- * the stored weights, and stamp the stored `version` so every computed row records the
- * real config_version. When no config row exists we return undefined → cold-start
- * default. (M3 will reconcile the jsonb shapes; until then this is the faithful path.)
+ * The stored jsonb does NOT match the scoring shapes 1:1 (verified against migration
+ * 0021 + the live row): `weights_jsonb` matches, but `anchors_jsonb` uses non-canonical
+ * KPI keys (e.g. `iterations_to_merge`, `suggestion_acceptance`, `skill_file_leverage`)
+ * plus an `inverted` field the strict scoring anchorSchema rejects, and `sizing_jsonb`
+ * is DB-shaped (`{weights,thresholds,tie_break_pct}`). The reconciler maps the anchor
+ * keys, drops `inverted`, and translates the sizing shape — so the STORED weights,
+ * anchors, and sizing are honored, with per-field fallback to the canonical defaults
+ * for anything absent/invalid. resolveScoringConfig then re-validates the assembled
+ * RawIndexConfig with zod. When no config row exists we return undefined → cold-start
+ * default. NEVER throws.
  */
 export async function loadScoringConfig(functionId: string): Promise<RawIndexConfig | undefined> {
   const db = looseDb();
   const row = (
     await db
       .from('index_config')
-      .select('version, weights_jsonb, sizing_jsonb, function_id')
+      .select('version, weights_jsonb, anchors_jsonb, sizing_jsonb, function_id')
       .eq('function_id', functionId)
       .order('version', { ascending: false })
       .maybeSingle()
-  ).data as { version?: unknown; weights_jsonb?: unknown } | null;
+  ).data as {
+    version?: unknown;
+    weights_jsonb?: unknown;
+    anchors_jsonb?: unknown;
+    sizing_jsonb?: unknown;
+  } | null;
 
   if (!row) return undefined;
 
-  const version = num(row.version);
-  const w = (row.weights_jsonb ?? {}) as Record<string, unknown>;
-  const weights = {
-    usage: num(w.usage ?? DEFAULT_INDEX_CONFIG.weights.usage),
-    efficiency: num(w.efficiency ?? DEFAULT_INDEX_CONFIG.weights.efficiency),
-    effectiveness: num(w.effectiveness ?? DEFAULT_INDEX_CONFIG.weights.effectiveness),
-    proficiency: num(w.proficiency ?? DEFAULT_INDEX_CONFIG.weights.proficiency),
-  };
-  // Guard: if stored weights don't sum to ~1, fall back to the default weights so the
-  // engine never throws on a malformed seed (assertWeightsSumToOne).
-  const sum = weights.usage + weights.efficiency + weights.effectiveness + weights.proficiency;
-  const safeWeights = Math.abs(sum - 1) <= 1e-6 ? weights : { ...DEFAULT_INDEX_CONFIG.weights };
-
-  return {
-    configVersion: `v${version > 0 ? version : 1}`,
-    weights: safeWeights,
-    // anchors omitted → scoring merges the canonical defaults (matches the v1 seed).
-    sizing: {
-      modulesWeight: DEFAULT_INDEX_CONFIG.sizing.modulesWeight,
-      blastWeight: DEFAULT_INDEX_CONFIG.sizing.blastWeight,
-      coldStart: { ...DEFAULT_INDEX_CONFIG.sizing.coldStart },
-      tieBreakBand: DEFAULT_INDEX_CONFIG.sizing.tieBreakBand,
-    },
-  };
+  return reconcileStoredConfig(row);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,34 +515,97 @@ export interface AssembledInputs {
 }
 
 /**
+ * Attribute each deploy to an employee. deploys carries NO employee_id, so we join
+ * deploys.sha → gh_prs.merge_sha (the PR's merge commit) → gh_prs.employee_id. Falls
+ * back to the single self/first member for any deploy whose sha doesn't resolve, so the
+ * single-person demo keeps its change-failure signal. Returns employeeId → DeployRow[].
+ */
+function attributeDeploys(
+  deployDbRows: DeployDbRow[],
+  prDbRows: PrDbRow[],
+  fallbackEmployeeId: string | null,
+): Map<string, DeployRow[]> {
+  // merge_sha → employee_id (only PRs that have both a merge_sha and a resolved author).
+  const empBySha = new Map<string, string>();
+  for (const p of prDbRows) {
+    const sha = str(p.merge_sha);
+    const emp = str(p.employee_id);
+    if (sha && emp) empBySha.set(sha.toLowerCase(), emp);
+  }
+
+  const out = new Map<string, DeployRow[]>();
+  const push = (empId: string, dep: DeployRow) => {
+    const arr = out.get(empId) ?? [];
+    arr.push(dep);
+    out.set(empId, arr);
+  };
+
+  for (const d of deployDbRows) {
+    const sha = str(d.sha);
+    const resolved = sha ? empBySha.get(sha.toLowerCase()) ?? null : null;
+    const empId = resolved ?? fallbackEmployeeId;
+    if (empId === null) continue; // no member to attribute to (no self yet) → drop
+    push(empId, mapDeploy(d));
+  }
+  return out;
+}
+
+/**
  * Assemble the full `computeDaily` inputs for a function on a run date. Lists active
  * employees (self ensured first), reads the windowed raw evidence, partitions it by
- * employee_id, and maps each partition into `MemberRawRows`. Function-scoped evidence
- * with no employee_id (deploys today) is attributed to the self/first member so the
- * change-failure signal isn't dropped in the single-person demo.
+ * employee_id, and maps each partition into `MemberRawRows`. Per-PR Effectiveness +
+ * agentic signals are derived (pr-signals.ts) from the joined gh_commits / pr_ai_link /
+ * blame_snapshots rows and merged into each PrRow. Deploys (no employee_id) are
+ * attributed by sha→PR author, falling back to the self/first member.
  */
 export async function assembleMembers(functionId: string, date: string): Promise<AssembledInputs> {
   const b = boundsFor(date);
   const employees = await listActiveEmployees(functionId);
 
-  const [prDbRows, sessionDbRows, deployDbRows, sizingDbRows] = await Promise.all([
-    loadWindowPrs(functionId, b),
-    loadWindowSessions(functionId, b),
-    loadWindowDeploys(functionId, b),
-    loadSizingPrs(functionId, b),
-  ]);
-  // blame is read but only used to enrich employee-level retention in M3; loaded here
-  // so the counts are honest and the read columns are validated.
+  const [prDbRows, sessionDbRows, deployDbRows, sizingDbRows, commitDbRows, linkDbRows] =
+    await Promise.all([
+      loadWindowPrs(functionId, b),
+      loadWindowSessions(functionId, b),
+      loadWindowDeploys(functionId, b),
+      loadSizingPrs(functionId, b),
+      loadWindowCommits(functionId, b),
+      loadPrAiLinks(functionId),
+    ]);
   const blameDbRows = await loadWindowBlame(functionId, b);
+
+  // ── Derive per-PR signals (pure) from the joined evidence ──────────────────
+  const commits: CommitSignalInput[] = commitDbRows.map((c) => ({
+    prId: str(c.pr_id),
+    repo: str(c.repo),
+    authorHandle: str(c.author_handle),
+    tsMs: ms(c.ts),
+    aiAssisted: bool(c.ai_assisted),
+  }));
+  const blame: BlameSignalInput[] = blameDbRows.map((bl) => ({
+    repo: str(bl.repo),
+    authorHandle: str(bl.author_handle),
+    aiAssisted: bool(bl.ai_assisted),
+    aliveAt30d: bl.alive_at_30d === null ? null : bool(bl.alive_at_30d),
+  }));
+  const linkedPrIds = new Set<string>();
+  for (const l of linkDbRows) {
+    const id = str(l.pr_id);
+    if (id) linkedPrIds.add(id);
+  }
+  const derived = derivePrSignals({
+    prs: prDbRows.map(toPrSignalInput),
+    commits,
+    blame,
+    linkedPrIds,
+  });
 
   // Partition PRs / sessions by employee_id.
   const prsByEmp = groupBy(prDbRows, (r) => str(r.employee_id));
   const sessByEmp = groupBy(sessionDbRows, (r) => str(r.employee_id));
 
-  // Deploys carry no employee_id → attribute all to the first (self) member, so the
-  // single-person demo keeps its change-failure signal. With N>1 this is revisited.
-  const deployRows: DeployRow[] = deployDbRows.map(mapDeploy);
+  // Deploys: sha→PR-author attribution, fall back to the self/first member.
   const selfId = employees[0]?.id ?? null;
+  const deploysByEmp = attributeDeploys(deployDbRows, prDbRows, selfId);
 
   // skills authored: NOT yet a raw table (M3 authorship capture). Empty for every
   // member today → Proficiency authorship KPIs report no signal, never fabricated.
@@ -495,14 +619,16 @@ export async function assembleMembers(functionId: string, date: string): Promise
         memberId: emp.id,
         workingDays: workingDaysFor(empPrs, empSessions),
       },
-      prs: empPrs.map(mapPr),
+      prs: empPrs.map((r) => mapPr(r, derived.get(String(r.id)))),
       sessions: empSessions.map(mapSession),
-      deploys: selfId !== null && emp.id === selfId ? deployRows : [],
+      deploys: deploysByEmp.get(emp.id) ?? [],
       skills: skillsByEmp(emp.id),
     };
   });
 
-  const sizingPrs: PrRow[] = sizingDbRows.map(mapPr);
+  // sizingPrs only feed S/M/L tertiles (files/hunks/modules/blast) — no per-PR signal
+  // needed, so mapPr is called without a derived map (honest defaults there).
+  const sizingPrs: PrRow[] = sizingDbRows.map((r) => mapPr(r));
   const config = await loadScoringConfig(functionId);
 
   return {

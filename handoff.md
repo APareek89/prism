@@ -17,9 +17,9 @@
 | **M0 — Scaffold** (schema + RLS + deterministic scoring engine + keyless shell) | ✅ DONE |
 | **M1 — Full faithful UI** (4 views + drill-in, empty states, read layer) | ✅ DONE |
 | **M2 — Connectors + pipeline** (GitHub/Claude/Sentry, AI→PR link, onboarding, ingest→score, Admin wiring) | ✅ DONE |
-| **M3 — Scoring fidelity** (per-PR blame/agentic/rework signals, config anchors reconcile) | ⏳ pending |
-| **M4 — Insights + automation** (LangGraph agents, Inngest daily pipeline, Resend email, recommendations, courses, adoption) | ⏳ pending |
-| **M5 — Demo polish + end-to-end** | ⏳ pending |
+| **M3 — Scoring fidelity** (per-PR revert/AI-lines/agentic/rework signals, stored config honored) | ✅ DONE |
+| **M4 — Insights + automation** (LangGraph agents, Inngest daily pipeline + on-demand full loop, Resend email, deterministic recommendations + adoption, learning-studio courses) | ✅ DONE |
+| **M5 — Demo polish + end-to-end** | ⏳ in progress |
 
 **Verified live:** Claude Code connector ingested **279 real `~/.claude` sessions**; the on-demand
 pipeline runs clean (`ok:true`) and persists `kpi_daily`(13) + `index_daily`(2). Index is currently
@@ -105,18 +105,30 @@ Set: `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE
   from `cwd`/`gitBranch`, **no** top-level `account_uuid`; cost derived (pricing.ts).
 - Don't write map-key separators as raw `\x00` bytes (makes files binary) — use `\x1f` text escape.
 
+## Automation loop (M4) — how it runs
+`POST /api/pipeline/run` (Admin "Run pipeline now") and the Inngest daily function both call
+`lib/pipeline/full-loop.ts runFullLoop({functionId,date})` = runPipeline (score) → runInsightsForScope +
+runPrLevel (LangGraph agents → `insights`) → deriveAndStoreRecommendations (`recommendations`) →
+assignCourses (`courses`) → monitorAdoption → queueDigests (`comms_log`/`comms_outbox`).
+- **Agents** (`lib/agents/*`): LangGraph TS, narrative only. Numbers computed in `lib/agents/assemble.ts`;
+  LLM schemas have NO numeric fields; `grounding.ts` drops any fabricated number. In DEMO_MODE (or no
+  ANTHROPIC key) `mock-model.ts` produces schema-valid canned narration — **runs keyless**. Graph SKIPS a
+  scope when confidence < 0.40, so with no GitHub PRs the index/insights stay empty (correct).
+- **Recommendations/adoption** (`lib/recommendations/*`, `lib/adoption/*`): pure deterministic rules, no
+  LLM. Fire on real session/KPI data; adoption re-verifies from the same data and advances status.
+- **Email** (`lib/email/*` + `supabase/functions/send-digest`): digest is RENDERED + QUEUED in-app; the
+  Deno Edge Function holds RESEND_API_KEY and sends. Blank RESEND key ⇒ queues, no-op send.
+- **Courses** (`lib/courses/*`): maps weak dimension → ALS course; completion is Prism-owned via
+  `app/api/courses/check`. ALS repo read at `~/Documents/agentic-learning-studio`.
+- **Inngest** (`inngest/*`, `app/api/inngest`): daily cron `0 6 * * *` + on-demand event; run
+  `npm run inngest:dev` for the local durable dev server.
+
 ## Remaining work
-- **M3**: `lib/pipeline/assemble.ts` currently zeroes per-PR signals (aiLinesMerged, aiLinesAliveAt30d,
-  agenticMajority, defectReworkWithin14d, isSelfRevert) — wire them from `blame_snapshots` + `pr_ai_link`
-  + `gh_commits` so Effectiveness/agentic KPIs compute once PRs exist. Reconcile stored
-  `anchors_jsonb/sizing_jsonb` into `resolveScoringConfig` (currently uses canonical defaults). Deploy
-  attribution by employee for N>1.
-- **M4**: `lib/agents/*` (LangGraph state/graph/4 nodes/model/schemas/grounding/prompts/run) — narrative
-  only, grounded in scoring numbers; `inngest/*` daily pipeline (cron + on-demand, the 12 steps);
-  `supabase/functions/send-digest` (Resend) + email templates + outbox; `lib/recommendations/*` rules;
-  `lib/adoption/*` monitoring; `lib/courses/*` (clone `APareek89/agentic-learning-studio@staging` — it's
-  at `~/Documents/agentic-learning-studio`; completion is **Prism-owned** via a knowledge-check proxy).
-- **M5**: end-to-end run polish, README refresh, Render deploy prep.
+- **M5**: end-to-end run with real GitHub data (connect the App on a repo, merge PRs, Run pipeline → the
+  index crosses the 0.40 threshold and insights/recs/course/digest populate), README refresh, Render
+  deploy prep. Known M4 follow-ups: agent `ai_slop` verdict stays inert until per-PR agentic/rework
+  signals are surfaced onto `gh_prs` (M3 computes them for scoring at runtime; the agent's PrRecord reads
+  gh_prs which lacks those columns) — revert/re-prompt verdicts work today.
 
 ## Commits (main)
 `5c6d1e7` spec → `816f330` architecture → `1eb3bf8` M0 → `a72694d` db fixes → `a452bb3` M1 →

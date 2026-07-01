@@ -402,13 +402,17 @@ async function scopeInsights(
   kind: string,
 ): Promise<InsightRowLite[]> {
   const client = await db();
+  // Newest day first (a fresh slot is upserted per pipeline date) + a bound, so the
+  // surfaces show the latest run's insights rather than accumulating across days.
   const filter = client
     .from('insights')
     .select('title, body, dimension, est_impact, kind, created_at')
     .eq('scope', scope)
     .eq('scope_id', scopeId)
     .eq('kind', kind)
-    .order('created_at', { ascending: false }) as DbReadFilter;
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(12) as DbReadFilter;
   const raw = await selectRows(filter);
   return raw as unknown as InsightRowLite[];
 }

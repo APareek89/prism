@@ -315,16 +315,20 @@ export async function getRecommendations(employeeId: string): Promise<Recommenda
       .order('created_at', { ascending: false }) as DbReadFilter,
   )) as unknown as RecLite[];
 
-  return raw.map((r) => {
-    const kind = recKind(r.kind);
-    return {
-      title: r.ref,
-      body: r.rationale ?? '',
-      kind,
-      tag: recTag(kind),
-      marker: '✦',
-    };
-  });
+  // Only OPEN recs are live nudges — adopted/dismissed are resolved and must not
+  // reappear as suggestions (the adoption monitor advances them; the UI must respect it).
+  return raw
+    .filter((r) => r.status !== 'adopted' && r.status !== 'dismissed')
+    .map((r) => {
+      const kind = recKind(r.kind);
+      return {
+        title: r.ref,
+        body: r.rationale ?? '',
+        kind,
+        tag: recTag(kind),
+        marker: '✦',
+      };
+    });
 }
 
 /** rec_kind enum is already ('skill'|'process'|'course'); fall back to skill. */
@@ -403,7 +407,9 @@ async function employeeInsights(employeeId: string, kind: string): Promise<Insig
       .eq('scope', 'employee')
       .eq('scope_id', employeeId)
       .eq('kind', kind)
-      .order('created_at', { ascending: false }) as DbReadFilter,
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(12) as DbReadFilter,
   );
   return raw as unknown as InsightLite[];
 }
