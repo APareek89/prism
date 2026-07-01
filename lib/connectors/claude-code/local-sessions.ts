@@ -10,7 +10,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { parseSessionFile, type RawSession } from './parser';
+import { parseSessionFile, type RawSession, type PrRef } from './parser';
 import { deriveCostUsd } from './pricing';
 import { makeSessionKey } from './byo';
 import { serverEnv } from '@/lib/config/env';
@@ -72,6 +72,13 @@ export function decodeProjectDir(encoded: string): string {
   return encoded;
 }
 
+/** True when a branch value names a real feature branch (not null/'HEAD'/detached). */
+function isRealBranch(b: string | null): boolean {
+  if (b === null) return false;
+  const v = b.trim().toLowerCase();
+  return v !== '' && v !== 'head' && v !== 'detached';
+}
+
 /** Mutable accumulator mirroring RawSession for cross-file merge. */
 interface Merged {
   sessionId: string;
@@ -89,6 +96,8 @@ interface Merged {
   skills: Set<string>;
   promptLenSum: number;
   promptCount: number;
+  /** union of pr-link refs across files, deduped by "repo#number". */
+  prRefs: Map<string, PrRef>;
 }
 
 /** Fold one parsed RawSession into the cross-file merge map. */
@@ -112,12 +121,16 @@ function mergeInto(map: Map<string, Merged>, s: RawSession): void {
       skills: new Set<string>(),
       promptLenSum: 0,
       promptCount: 0,
+      prRefs: new Map<string, PrRef>(),
     };
     map.set(key, m);
   }
   // earliest ts
   if (s.ts && (!m.ts || s.ts < m.ts)) m.ts = s.ts;
-  if (m.branch === null && s.branch != null) m.branch = s.branch;
+  // Prefer a real branch over a useless 'HEAD'/detached/null carried by another file.
+  if (isRealBranch(s.branch) && !isRealBranch(m.branch)) m.branch = s.branch;
+  else if (m.branch == null && s.branch != null) m.branch = s.branch;
+  for (const ref of s.prRefs) m.prRefs.set(`${ref.repo}#${ref.number}`, ref);
   m.turns += s.turns;
   m.tokensIn += s.tokensIn;
   m.tokensOut += s.tokensOut;
@@ -162,6 +175,9 @@ function finalize(m: Merged): RawSession {
     skillsUsed: Array.from(m.skills).sort(),
     promptLenAvg:
       m.promptCount > 0 ? Math.round((m.promptLenSum / m.promptCount) * 100) / 100 : null,
+    prRefs: Array.from(m.prRefs.values()).sort((a, b) =>
+      a.repo === b.repo ? a.number - b.number : a.repo.localeCompare(b.repo),
+    ),
   };
 }
 

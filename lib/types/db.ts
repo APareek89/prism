@@ -259,13 +259,16 @@ export interface BlameSnapshotRow {
   snapshot_at: Timestamp;
 }
 
-/** pr_ai_link — correlational AI→PR link (method + confidence; never in the score). */
+/** pr_ai_link — correlational AI→PR link (method + confidence; never in the score).
+ *  method precedence (strongest first): pr_link > sha > branch > coauthor.
+ *  `pr_link` is the first-party Claude Code `pr-link` event (an exact
+ *  session→(repo,number) assertion) — see lib/connectors/link/match-keys.ts. */
 export interface PrAiLinkRow {
   id: Uuid;
   function_id: Uuid;
   pr_id: Uuid;
   session_id: Uuid | null;
-  method: 'branch' | 'coauthor' | 'sha';
+  method: 'pr_link' | 'branch' | 'coauthor' | 'sha';
   confidence: number;
   created_at: Timestamp;
 }
