@@ -67,8 +67,8 @@ interface KpiDailyDb {
 /**
  * Map a scoring KpiDailyRow → the kpi_daily DB row. `confidence` on the scoring row is
  * a 0–1 numeric score; the DB column is a band enum (high|medium|low|insufficient), so
- * we map the score to a band. signal_count defaults to 0 (the engine folds signals into
- * the per-row confidence already; no separate per-KPI count is exposed on KpiDailyRow).
+ * we map the score to a band. signal_count carries the per-KPI observation count from the
+ * engine (KpiDailyRow.signalCount) — the agent read layer gates on it (metMinSignal).
  */
 function toKpiDb(r: KpiDailyRow, functionId: string, configVersion: number): Record<string, unknown> {
   return {
@@ -79,6 +79,7 @@ function toKpiDb(r: KpiDailyRow, functionId: string, configVersion: number): Rec
     function_id: functionId,
     raw_value: r.rawValue,
     norm_score: r.normScore,
+    signal_count: r.signalCount,
     confidence: scoreToBand(r.confidence),
     config_version: configVersion,
   };

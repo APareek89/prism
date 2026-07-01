@@ -17,6 +17,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   bandLabelFor,
+  bandLabelForStored,
   bandBlurbFor,
   confidenceName,
   isSuppressedBand,
@@ -385,7 +386,8 @@ export async function buildDigestInput(
 
   const suppressed = !top || isSuppressedBand(top.confidence) || top.l1 === null;
   const l1 = suppressed ? null : (top?.l1 ?? null);
-  const band = l1 === null ? null : bandLabelFor(l1);
+  // Honor the engine's stored band (L0/L5 gates) instead of bucketing by L1 alone.
+  const band = !suppressed && top ? (bandLabelForStored(top.band) ?? bandLabelFor(top.l1)) : null;
 
   let l1Delta: number | null = null;
   if (!suppressed && top) {

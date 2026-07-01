@@ -245,6 +245,31 @@ export function bandLabelFor(l1: number | null): BandLabel | null {
   return 'L0 · Dormant';
 }
 
+/**
+ * L0–L5 band label from the ENGINE's stored band enum ('L0'..'L5'). Unlike bandLabelFor
+ * (which buckets by L1 alone), this honors the engine's banding — including the L0 gate:
+ * a member with a real L1 but no AI-linked delivery is Dormant (L0), not the level their
+ * raw L1 would imply. Falls back to null for an unknown/missing band.
+ */
+export function bandLabelForStored(band: string | null | undefined): BandLabel | null {
+  switch (band) {
+    case 'L0':
+      return 'L0 · Dormant';
+    case 'L1':
+      return 'L1 · Basic';
+    case 'L2':
+      return 'L2 · Productive';
+    case 'L3':
+      return 'L3 · Workflow';
+    case 'L4':
+      return 'L4 · Power';
+    case 'L5':
+      return 'L5 · Multiplier';
+    default:
+      return null;
+  }
+}
+
 /** A one-line blurb for each band (from the design vocabulary). null when no band. */
 export function bandBlurbFor(label: BandLabel | null): string | null {
   if (!label) return null;

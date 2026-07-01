@@ -207,6 +207,7 @@ function kpiRowsFor(
     kpiId: k.kpiId,
     rawValue: k.value,
     normScore: k.norm,
+    signalCount: k.signals,
     confidence: result.confidence.score,
   }));
 }
