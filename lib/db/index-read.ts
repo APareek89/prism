@@ -31,6 +31,7 @@ import {
   periodView,
   WINDOW_LABEL,
   bandLabelFor,
+  bandLabelForStored,
   bandBlurbFor,
   confidenceName,
   confidencePctForBand,
@@ -172,7 +173,9 @@ export async function getIndex(
 
   const suppressed = isSuppressedBand(top.confidence) || top.l1 === null;
   const l1 = suppressed ? null : top.l1;
-  const band = l1 === null ? null : bandLabelFor(l1);
+  // Honor the engine's stored band (which applies the L0/L5 gates) rather than
+  // re-bucketing by L1 alone; fall back to the L1 bucket only if band is missing.
+  const band = suppressed ? null : (bandLabelForStored(top.band) ?? bandLabelFor(top.l1));
   const l1Delta = !suppressed && base ? subtract(top.l1, base.l1) : null;
 
   return {
