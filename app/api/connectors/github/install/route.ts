@@ -19,9 +19,8 @@
 import { withAdmin } from '@/lib/auth/guards';
 import { getAuthUser } from '@/lib/auth/session';
 import { isAdmin } from '@/lib/auth/roles';
-import { serverEnv } from '@/lib/config/env';
 import { GitHubConnector } from '@/lib/connectors/github';
-import { getInstallationOctokit, isGithubConfigured } from '@/lib/connectors/github/client';
+import { getApp, getInstallationOctokit, isGithubConfigured } from '@/lib/connectors/github/client';
 import {
   ok,
   badRequest,
@@ -68,13 +67,27 @@ export async function GET(req: Request): Promise<Response> {
   // ── install initiator ──────────────────────────────────────────────────────
   if (!installationIdRaw) {
     if (!isGithubConfigured()) return notConfigured('GitHub App is not configured');
-    const clientId = serverEnv.GITHUB_APP_CLIENT_ID;
-    if (!clientId) return badRequest('GITHUB_APP_CLIENT_ID is not set');
-    // The GitHub App install/authorize page keyed by client_id. After the user installs,
-    // GitHub redirects to the App's configured callback URL (this same route) with
-    // installation_id + setup_action=install.
-    const ghUrl = new URL('https://github.com/login/oauth/authorize');
-    ghUrl.searchParams.set('client_id', clientId);
+    // GitHub App INSTALL flow (not OAuth user-auth): send the user to the app's install
+    // page (`/apps/<slug>/installations/new`). After they pick repos and install, GitHub
+    // redirects to the App's **Setup URL** (this route) with installation_id +
+    // setup_action=install. We resolve the app slug via the App API so no extra env var
+    // is needed. (The OAuth authorize URL returns a ?code, not an installation_id — wrong
+    // flow for connecting a repo.)
+    let slug: string | null = null;
+    try {
+      const app = getApp();
+      const res = await app.octokit.request('GET /app');
+      slug = (res.data?.slug as string | undefined) ?? null;
+    } catch (e) {
+      return badRequest(
+        'Could not resolve the GitHub App slug (check GITHUB_APP_ID / GITHUB_APP_PRIVATE_KEY): ' +
+          errMessage(e).slice(0, 120),
+      );
+    }
+    if (!slug) return badRequest('GitHub App slug not found for this App ID');
+    const ghUrl = new URL(`https://github.com/apps/${slug}/installations/new`);
+    // Round-trip a marker so the callback origin is unambiguous.
+    ghUrl.searchParams.set('state', 'prism-connect');
     return Response.redirect(ghUrl.toString(), 302);
   }
 
