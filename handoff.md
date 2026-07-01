@@ -21,11 +21,21 @@
 | **M4 — Insights + automation** (LangGraph agents, Inngest daily pipeline + on-demand full loop, Resend email, deterministic recommendations + adoption, learning-studio courses) | ✅ DONE |
 | **M5 — Demo polish + end-to-end** | ✅ DONE (verified on real data) |
 
-**Verified live:** Claude Code connector ingested **279 real `~/.claude` sessions**; the on-demand
-pipeline runs clean (`ok:true`) and persists `kpi_daily`(13) + `index_daily`(2). Index is currently
-`L0 / insufficient` — **correct**, because there are no GitHub PRs yet (Effectiveness/Efficiency need
-delivery data; only Usage=10% has signal, below the 0.40 publish threshold). Connect GitHub + merge a
-PR + Run pipeline → the index crosses the threshold and populates.
+**Verified live (2026-07-01):** both connectors are **connected** (the earlier "clean slate" note was
+stale). Claude Code ingested **287 `~/.claude` sessions**; GitHub backfilled **8 merged dogfood PRs**
+(#1–#8). On-demand pipeline runs clean (`ok:true`) → `kpi_daily`(13) + `index_daily`(3). Index is
+`L0 / low` for the self employee — **correct**, because **`pr_ai_link`=0**: no Claude session links to
+any PR yet (session `branch=HEAD`, no sha/trailer on the session side), so every AI-denominated KPI is
+0/null. Fixing the AI→PR link is the key next piece.
+
+**Session 2026-07-01 — 3 wiring fixes** (branch `fix/scoring-display-wiring`, PR open):
+1. **`signal_count` now persisted** (it was computed then dropped in `kpiRowsFor`/`toKpiDb`) → improvement
+   + "what's going well" insights now generate at employee scope (member-detail view). 2. **Read layer +
+   email now show the engine's stored band** (`bandLabelForStored`) — a gated `L0 · Dormant` instead of an
+   L1-bucketed `L2 · Productive`. 3. **pr_level titles** no longer falsely say "AI-assisted" for non-AI PRs.
+**Still open:** (a) **AI→PR link = 0** — root cause; needs a linking-key design decision (session side has
+no branch/sha/trailer to join on). (b) **Function-scope improvement panel empty** — the engine emits KPI
+rows only at employee scope, so function has no `kpi_daily` (persist function KPIs, or aggregate employee KPIs).
 
 ---
 
