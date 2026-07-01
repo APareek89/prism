@@ -19,7 +19,7 @@
 | **M2 — Connectors + pipeline** (GitHub/Claude/Sentry, AI→PR link, onboarding, ingest→score, Admin wiring) | ✅ DONE |
 | **M3 — Scoring fidelity** (per-PR revert/AI-lines/agentic/rework signals, stored config honored) | ✅ DONE |
 | **M4 — Insights + automation** (LangGraph agents, Inngest daily pipeline + on-demand full loop, Resend email, deterministic recommendations + adoption, learning-studio courses) | ✅ DONE |
-| **M5 — Demo polish + end-to-end** | ⏳ in progress |
+| **M5 — Demo polish + end-to-end** | ✅ DONE (verified on real data) |
 
 **Verified live:** Claude Code connector ingested **279 real `~/.claude` sessions**; the on-demand
 pipeline runs clean (`ok:true`) and persists `kpi_daily`(13) + `index_daily`(2). Index is currently

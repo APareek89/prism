@@ -42,13 +42,19 @@ npm run dev                     # http://localhost:3000 — empty/awaiting-signa
 npm run inngest:dev             # durable pipeline dev server (separate terminal)
 ```
 
-## Milestones
-- **M0** scaffold + schema + RLS + deterministic scoring engine (+ tests) — keyless. ← current
-- **M1** full UI (4 views + drill-in), empty states, Admin interactive — keyless. **→ pause for keys**
-- **M2** connectors (GitHub / Claude local sessions / Sentry) + AI→PR link + onboarding
-- **M3** scoring wired to real data → views light up
-- **M4** LangGraph agents + Inngest pipeline + Resend digest + courses + adoption monitoring
-- **M5** end-to-end demo + polish
+## Milestones — all shipped
+- **M0** ✅ scaffold + schema + RLS + deterministic scoring engine (143 tests) — keyless
+- **M1** ✅ full faithful UI (4 views + drill-in), empty states, Admin interactive
+- **M2** ✅ connectors (GitHub App / Claude local sessions / Sentry) + AI→PR link + onboarding + on-demand pipeline
+- **M3** ✅ per-PR scoring fidelity (revert/AI-lines/agentic/rework) + stored `index_config` honored
+- **M4** ✅ LangGraph insight agents (narrative-only, grounded, keyless) + Inngest daily pipeline + full on-demand loop + Resend digest + deterministic recommendations/adoption + learning-studio courses
+- **M5** ✅ end-to-end verified on real data (279 Claude sessions → recommendations + course assigned)
+
+**To see the L1 index cross the publish threshold:** connect the GitHub App on a repo, merge a PR or
+two (with Claude Code), then Admin → **Run pipeline now**. Until then only Usage has signal, so the
+index honestly reports *Insufficient* — by design.
+
+See [`handoff.md`](handoff.md) for the full architecture, decisions, and gotchas.
 
 ## Scripts
 | | |
