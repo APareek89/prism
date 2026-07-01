@@ -278,6 +278,9 @@ export interface KpiDailyRow {
   kpiId: KpiId;
   rawValue: number | null;
   normScore: number | null;
+  /** underlying observation count for this KPI → persisted as kpi_daily.signal_count.
+   *  The agent read layer uses it as the min-signal gate (metMinSignal = count > 0). */
+  signalCount: number;
   /** dimension confidence carried for the row (PRD §6 kpi_daily.confidence). */
   confidence: number;
 }
