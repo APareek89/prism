@@ -353,7 +353,7 @@ function prTitle(verdict: string, pr: PrRecord | undefined): string {
     case 're_prompt':
       return `${ref}re-prompt loop before merge`;
     default:
-      return `${ref}clean AI-assisted merge`;
+      return `${ref}${pr?.aiLinked ? 'clean AI-assisted merge' : 'clean merge'}`;
   }
 }
 
