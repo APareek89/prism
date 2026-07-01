@@ -123,13 +123,61 @@ assignCourses (`courses`) → monitorAdoption → queueDigests (`comms_log`/`com
 - **Inngest** (`inngest/*`, `app/api/inngest`): daily cron `0 6 * * *` + on-demand event; run
   `npm run inngest:dev` for the local durable dev server.
 
-## Remaining work
-- **M5**: end-to-end run with real GitHub data (connect the App on a repo, merge PRs, Run pipeline → the
-  index crosses the 0.40 threshold and insights/recs/course/digest populate), README refresh, Render
-  deploy prep. Known M4 follow-ups: agent `ai_slop` verdict stays inert until per-PR agentic/rework
-  signals are surfaced onto `gh_prs` (M3 computes them for scoring at runtime; the agent's PrRecord reads
-  gh_prs which lacks those columns) — revert/re-prompt verdicts work today.
+## Connectors — how data flows in
+Everything writes **raw evidence** tables via the service-role client; the scoring engine reads them.
+Connectors are keyless-safe (a not-configured one writes nothing, never throws). Pipeline order:
+`ingest.github → ingest.claude_code → ingest.sentry → link.ai_to_pr → blame.refresh → assemble →
+computeDaily → persist` (then M4: insights → recs → courses → adoption → comms).
+
+- **GitHub** (`lib/connectors/github/*`): App auth (base64 PEM → installation token). On connect it lists
+  the installation's repos → `functions.repo_ids`, then `backfill()` paginates merged+open PRs, fetches
+  per-file diffs + commits, computes RAW sizing (`files + hunks + 2·modules + 3·blast`), detects reverts
+  (≤14d), and extracts `Co-authored-by: Claude` trailers → `gh_commits.ai_assisted`. Author handle →
+  employee via `identity.ts`. Writes `gh_prs`, `gh_commits`, `blame_snapshots`. Webhooks
+  (`/api/connectors/github/webhook`) keep it live; "Run pipeline now" backfills without webhooks.
+- **Claude Code** (`lib/connectors/claude-code/*`): reads `~/.claude/**/*.jsonl` (the **local** demo path).
+  `parser.ts` folds `message.usage` tokens, `message.model`, and derives repo/branch from top-level
+  `cwd`/`gitBranch`; cost is DERIVED via `pricing.ts` (no top-level `account_uuid` in local files).
+  `session-map.ts` upserts `cc_sessions` (unique on `session_id,repo`) bound to the is_demo self employee.
+  Writes `cc_sessions`.
+- **Sentry** (`lib/connectors/sentry/*`): releases→`deploys`, incidents→`incidents` (change-failure/MTTR).
+  Optional — degrades to "insufficient signal" when unconfigured.
+- **AI→PR link** (`lib/connectors/link/ai-to-pr.ts`): correlates a `cc_session` to a merged `gh_pr` and
+  writes `pr_ai_link {method, confidence}`. This is what makes a PR "AI-assisted" for the KPIs.
+
+## How a Claude session links to a repo/PR  ← key mental model
+A `cc_session` carries `repo` (from the session's `cwd`) and `branch` (from `gitBranch`). The AI→PR link
+matches it to a `gh_pr` by, in order: **branch** (`session.branch == pr.head_ref`) · **coauthor** (the
+PR's commits have a `Co-authored-by: Claude` trailer) · **sha** overlap. So to generate linked data:
+**do the work with Claude Code *inside the connected repo's directory*, on a feature branch, then open a
+PR from that branch.** The session (cwd=repo, branch=feature-x) then links to the PR (head_ref=feature-x).
+- `CLAUDE_LOCAL_SESSIONS_DIR=~/.claude` is GLOBAL — the scan ingests ALL your Claude sessions across every
+  repo; each maps to its own repo via `cwd`. Only sessions/PRs for the **connected** repo(s)
+  (`functions.repo_ids`) get AI→PR-linked and feed Effectiveness/Efficiency; other-repo sessions still
+  count toward Usage/tokens.
+- The self employee's `github_handle` must equal the repo's PR author (set to **`APareek89`**) or PRs land
+  unmatched. Set via the roster, or already done for this demo.
+
+## GitHub connect (current state)
+- App = **`prismai1989`** (App ID 4181826). "Connect GitHub" now redirects to the **install** flow
+  (`/apps/prismai1989/installations/new`), fixed in PR #6 (was wrongly using the OAuth authorize URL).
+- Because "Request user authorization (OAuth) during installation" is ON, the Setup URL is disabled; GitHub
+  post-install redirects to the **User authorization Callback URL** (set it to
+  `http://localhost:3000/api/connectors/github/install`) WITH `installation_id` → our callback connects +
+  backfills.
+- Repo seeded with **6 real dogfood PRs** (#1–#6, all Claude-coauthored). `functions.repo_ids` =
+  `{APareek89/prism}`, self employee `github_handle=APareek89`. DB is a **clean slate** (connectors
+  not_configured, no ingested data) awaiting the live connect.
+
+## Testing status / next
+Awaiting the user's one manual step: **GitHub App install** (browser approval — only the repo owner can).
+Then: Scan Claude → Connect GitHub (install on APareek89/prism) → Run pipeline → the index scores the 6
+PRs. Known M4 follow-up: agent `ai_slop` verdict is inert until per-PR agentic/rework signals are surfaced
+onto `gh_prs` columns (M3 computes them for scoring at runtime; the agent's PrRecord reads gh_prs) —
+revert/re-prompt verdicts work today.
 
 ## Commits (main)
 `5c6d1e7` spec → `816f330` architecture → `1eb3bf8` M0 → `a72694d` db fixes → `a452bb3` M1 →
-`41e2050` M2 → `5ac1eff`/`02cd431` M2 convergence. (Later commits append below as M3–M5 land.)
+`41e2050`/`5ac1eff`/`02cd431` M2 → `9d98a71` M3+M4 → `35da916` M5 docs. Then dogfood PRs #1–#6
+(reset script, testing/dogfooding docs, PR template, docs index, **#6 github install-flow fix**).
+Repo: `APareek89/prism` (private). Workflow going forward = PRs (see `docs/dogfooding.md`).
