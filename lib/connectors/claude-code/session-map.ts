@@ -48,7 +48,8 @@ function adminDb(): AdminDb {
   return createAdminClient() as unknown as AdminDb;
 }
 
-/** The cc_sessions insert payload — keys are EXACT column names from 0008. */
+/** The cc_sessions insert payload — keys are EXACT column names from 0008 (+ pr_refs
+ *  added in migration 0033). */
 export interface CcSessionInsert {
   function_id: string;
   employee_id: string | null;
@@ -68,6 +69,9 @@ export interface CcSessionInsert {
   suggestions_accepted: number;
   skills_used: string[];
   prompt_len_avg: number | null;
+  /** PRs this session opened/pushed (Claude Code `pr-link` events). jsonb array of
+   *  {repo, number}. The exact first-party join key the AI→PR linker reads. */
+  pr_refs: Array<{ repo: string; number: number }>;
 }
 
 /** What a write returns: how many rows were upserted + the BYO classification. */
@@ -103,6 +107,7 @@ export function toCcSessionRow(
     suggestions_accepted: s.suggestionsAccepted,
     skills_used: s.skillsUsed,
     prompt_len_avg: s.promptLenAvg,
+    pr_refs: s.prRefs.map((r) => ({ repo: r.repo, number: r.number })),
   };
 }
 

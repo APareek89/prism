@@ -14,7 +14,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ingestWindow } from '@/lib/connectors/window';
-import { scoreMatch, type LinkMethod, type PrKeys, type SessionKeys } from './match-keys';
+import { scoreMatch, type LinkMethod, type PrKeys, type PrRef, type SessionKeys } from './match-keys';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Loose query surface (the generated Database has empty Tables)
@@ -55,6 +55,8 @@ interface SessionRow {
   id: string;
   repo: string | null;
   branch: string | null;
+  /** jsonb array of {repo, number} from Claude Code `pr-link` events (migration 0033). */
+  pr_refs: Array<{ repo?: string; number?: number }> | null;
 }
 interface CommitRow {
   pr_id: string | null;
@@ -124,7 +126,7 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
   try {
     const { data, error } = await db
       .from('cc_sessions')
-      .select('id, repo, branch')
+      .select('id, repo, branch, pr_refs')
       .eq('function_id', functionId);
     if (error) {
       stats.errors.push(`cc_sessions read: ${error.message ?? 'unknown'}`);
@@ -158,14 +160,26 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
     // Co-author signal is optional; branch/sha still work without it.
   }
 
-  // Index sessions by repo for cheap candidate narrowing.
-  const sessionsByRepo = new Map<string | null, SessionRow[]>();
-  for (const s of sessions) {
-    const key = s.repo ?? null;
-    const list = sessionsByRepo.get(key) ?? [];
-    list.push(s);
-    sessionsByRepo.set(key, list);
+  // Pre-derive, per session: its clean pr-link refs and the set of owner/repo slugs it
+  // is KNOWN to belong to (from those refs). The session's own `repo` column is a local
+  // FILESYSTEM PATH (e.g. /Users/.../prism), not an owner/repo slug, so it cannot be
+  // compared to gh_prs.repo directly — the pr-link refs are the reliable repo evidence.
+  interface SessionCand {
+    row: SessionRow;
+    prRefs: PrRef[];
+    knownRepos: Set<string>; // lower-cased owner/repo slugs from prRefs
   }
+  const cands: SessionCand[] = sessions.map((s) => {
+    const prRefs: PrRef[] = [];
+    const knownRepos = new Set<string>();
+    for (const r of s.pr_refs ?? []) {
+      if (typeof r?.repo === 'string' && typeof r?.number === 'number' && Number.isFinite(r.number)) {
+        prRefs.push({ repo: r.repo, number: r.number });
+        knownRepos.add(r.repo.trim().toLowerCase());
+      }
+    }
+    return { row: s, prRefs, knownRepos };
+  });
 
   const linkRows: Array<{
     function_id: string;
@@ -178,37 +192,45 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
   // sessionId → the pr_id to stamp on cc_sessions.linked_pr (first/highest link wins).
   const sessionLinkedPr = new Map<string, string>();
 
-  // 4. Score every (PR, candidate session) pair.
+  // 4. Score every (PR, session) pair. Precision guard (HARD project rule): the
+  //    pr_link signal is self-scoped (it names its own repo+number, so it can only bind
+  //    to the right PR). The WEAKER branch/coauthor signals are NOT repo-aware on their
+  //    own, so we only expose them for a session that is KNOWN (via its pr-link refs) to
+  //    belong to THIS PR's repo. A session with no pr-link refs contributes pr_link=∅
+  //    and, lacking repo evidence, is not eligible for a branch/coauthor link either —
+  //    missing a link is acceptable; a wrong one is not.
   for (const pr of prs) {
+    const prRepoNorm = (pr.repo ?? '').trim().toLowerCase();
     const prKeys: PrKeys = {
+      ref: { repo: pr.repo, number: pr.number },
       headRef: pr.head_ref,
       mergeSha: pr.merge_sha,
       coauthorShas: coauthorShasByPr.get(pr.id) ?? [],
     };
-    // Candidates: sessions in the same repo + sessions with no repo (cwd unresolved).
-    const candidates = [
-      ...(sessionsByRepo.get(pr.repo) ?? []),
-      ...(sessionsByRepo.get(null) ?? []),
-    ];
-    for (const s of candidates) {
+    const prHasCoauthor = (coauthorShasByPr.get(pr.id)?.length ?? 0) > 0;
+    for (const c of cands) {
+      // Repo-scope the weak signals: only when this session is known to be in the PR's
+      // repo. pr_link ignores this (it self-scopes inside scoreMatch).
+      const repoScoped = prRepoNorm.length > 0 && c.knownRepos.has(prRepoNorm);
       const sessionKeys: SessionKeys = {
-        branch: s.branch,
+        prRefs: c.prRefs,
+        branch: repoScoped ? c.row.branch : null,
         // The local-file session path has no commit SHAs; coauthor falls back to the
         // PR-side trailer presence. A SHA-bearing session (OTEL) would populate shas.
         shas: undefined,
-        hasCoauthorTrailer: (coauthorShasByPr.get(pr.id)?.length ?? 0) > 0,
+        hasCoauthorTrailer: repoScoped && prHasCoauthor,
       };
       const match = scoreMatch(prKeys, sessionKeys);
       if (!match.method) continue;
       linkRows.push({
         function_id: functionId,
         pr_id: pr.id,
-        cc_session_id: s.id,
+        cc_session_id: c.row.id,
         method: match.method,
         confidence: match.confidence,
       });
       linkedPrIds.add(pr.id);
-      if (!sessionLinkedPr.has(s.id)) sessionLinkedPr.set(s.id, pr.id);
+      if (!sessionLinkedPr.has(c.row.id)) sessionLinkedPr.set(c.row.id, pr.id);
     }
   }
 

@@ -50,6 +50,20 @@ export interface RawSession {
   skillsUsed: string[];
   /** mean user-prompt character length (null when no human prompts seen). */
   promptLenAvg: number | null;
+  /** PRs this session explicitly opened/pushed, captured from Claude Code `pr-link`
+   *  events ({repo:"owner/repo", number}). The EXACT first-party session→PR join key
+   *  used by the AI→PR linker. Empty when the client emitted no pr-link events.
+   *  Attached at the session level (pr-link carries no cwd), so every (sessionId, repo)
+   *  group parsed from the same file shares its session's pr refs. */
+  prRefs: PrRef[];
+}
+
+/** A repo-scoped PR identity from a `pr-link` event (mirrors match-keys.PrRef). */
+export interface PrRef {
+  /** owner/repo, e.g. "APareek89/prism" (pr-link.prRepository). */
+  repo: string;
+  /** the PR number (pr-link.prNumber). */
+  number: number;
 }
 
 /** Loose shape of one decoded .jsonl line. Everything optional — we validate
@@ -63,6 +77,9 @@ interface RawEvent {
   userType?: string;
   isMeta?: boolean;
   isSidechain?: boolean;
+  // `pr-link` event fields (Claude Code emits one when it opens/pushes a PR).
+  prNumber?: number;
+  prRepository?: string;
   message?: {
     role?: string;
     model?: string;
@@ -93,6 +110,14 @@ interface Acc {
   skills: Set<string>;
   promptLenSum: number;
   promptCount: number;
+  /** distinct branches this session CREATED via `git checkout -b` (recovered from
+   *  Bash tool calls). Used only to strengthen the branch signal when the top-level
+   *  gitBranch is useless ('HEAD'/detached) AND the session created exactly one branch
+   *  — an ambiguous multi-branch session is left on its top-level value so branch
+   *  matching never binds to the wrong PR. */
+  createdBranches: Set<string>;
+  /** PR refs from `pr-link` events, filled in a second pass keyed by sessionId. */
+  prRefs: PrRef[];
 }
 
 /** Normalize a non-finite/absent number to 0. */
@@ -134,7 +159,22 @@ function userPromptLen(content: unknown): number | null {
   return null;
 }
 
-/** Pull distinct Skill names from an assistant content array. */
+/** Match a branch CREATED in a shell command: `git checkout -b/-B <name>` or
+ *  `git switch -c/-C <name>`, tolerating intervening flags (e.g. `git checkout -q -b x`).
+ *  Global (a single command can create several). We only capture creations (`-b`/`-c`),
+ *  which name the feature branch a session authored — a plain `git checkout <name>`
+ *  could target any pre-existing ref and is not evidence of authorship, so it is
+ *  intentionally ignored. The create flag must be its OWN token (`(?:^|\s)-[bB]\s`) so
+ *  `-B`/`-b` inside another word can't false-trigger. */
+const CREATE_BRANCH_RE =
+  /git\s+(?:checkout|switch)\s+(?:-\S+\s+)*?-(?:[bB]|[cC])\s+(\S+)/g;
+
+/** Strip surrounding quotes a shell branch arg might carry. */
+function unquoteBranch(raw: string): string {
+  return raw.replace(/^['"]|['"]$/g, '');
+}
+
+/** Pull distinct Skill names + created branches from an assistant content array. */
 function scanAssistantContent(content: unknown, acc: Acc): void {
   if (!Array.isArray(content)) return;
   for (const block of content) {
@@ -147,6 +187,20 @@ function scanAssistantContent(content: unknown, acc: Acc): void {
     if (name === 'Skill') {
       const skill = input['skill'] ?? input['command'];
       if (typeof skill === 'string' && skill.length > 0) acc.skills.add(skill);
+    }
+    // Bash invocations: recover any feature branch the session created.
+    if (name === 'Bash') {
+      const cmd = input['command'];
+      if (typeof cmd === 'string' && cmd.length > 0) {
+        CREATE_BRANCH_RE.lastIndex = 0;
+        let m: RegExpExecArray | null;
+        while ((m = CREATE_BRANCH_RE.exec(cmd)) !== null) {
+          const raw = m[1];
+          if (typeof raw !== 'string') continue;
+          const br = unquoteBranch(raw);
+          if (br.length > 0) acc.createdBranches.add(br);
+        }
+      }
     }
   }
 }
@@ -180,6 +234,10 @@ export function parseSessionFile(
   opts: { fallbackSessionId: string; fallbackRepo: string },
 ): RawSession[] {
   const groups = new Map<string, Acc>();
+  // pr-link events are keyed only by sessionId (they carry NO cwd), so we collect
+  // them per sessionId and attach to every (sessionId, repo) group after the fold.
+  // Deduped by "repo#number" so a PR linked several times counts once.
+  const prRefsBySession = new Map<string, Map<string, PrRef>>();
 
   const lines = text.split('\n');
   for (const line of lines) {
@@ -192,6 +250,24 @@ export function parseSessionFile(
       continue; // malformed line — skip, never throw.
     }
     if (!ev || typeof ev !== 'object') continue;
+
+    // `pr-link` events are the exact first-party session→PR assertions. They carry a
+    // sessionId + prRepository + prNumber but no cwd, so collect them by sessionId
+    // (handled before the assistant/user gate below, which would otherwise drop them).
+    if (ev.type === 'pr-link') {
+      const sid = ev.sessionId || opts.fallbackSessionId;
+      const repo = typeof ev.prRepository === 'string' ? ev.prRepository.trim() : '';
+      const number = ev.prNumber;
+      if (repo.length > 0 && typeof number === 'number' && Number.isFinite(number)) {
+        let refs = prRefsBySession.get(sid);
+        if (!refs) {
+          refs = new Map<string, PrRef>();
+          prRefsBySession.set(sid, refs);
+        }
+        refs.set(`${repo}#${number}`, { repo, number });
+      }
+      continue;
+    }
 
     // Only substantive turns (assistant/user) carry the evidence we score, and they
     // always carry a top-level cwd in this format. Book-keeping events
@@ -221,6 +297,8 @@ export function parseSessionFile(
         skills: new Set<string>(),
         promptLenSum: 0,
         promptCount: 0,
+        createdBranches: new Set<string>(),
+        prRefs: [],
       };
       groups.set(key, acc);
     }
@@ -268,10 +346,13 @@ export function parseSessionFile(
       cacheRead: acc.cacheRead,
       cacheCreation: acc.cacheCreation,
     });
+    const prRefs = Array.from(prRefsBySession.get(acc.sessionId)?.values() ?? []).sort(
+      (a, b) => (a.repo === b.repo ? a.number - b.number : a.repo.localeCompare(b.repo)),
+    );
     out.push({
       sessionId: acc.sessionId,
       repo: acc.repo,
-      branch: acc.branch,
+      branch: resolveBranch(acc.branch, acc.createdBranches),
       ts: acc.ts,
       turns: acc.turns,
       tokensIn: acc.tokensIn,
@@ -285,7 +366,30 @@ export function parseSessionFile(
       skillsUsed: Array.from(acc.skills).sort(),
       promptLenAvg:
         acc.promptCount > 0 ? Math.round((acc.promptLenSum / acc.promptCount) * 100) / 100 : null,
+      prRefs,
     });
   }
   return out;
+}
+
+/** A top-level gitBranch value that is not a real feature branch (detached / unknown). */
+function isUselessBranch(b: string | null): boolean {
+  if (b === null) return true;
+  const v = b.trim().toLowerCase();
+  return v === '' || v === 'head' || v === 'detached';
+}
+
+/**
+ * Decide a session's branch. The top-level `gitBranch` wins whenever it names a real
+ * branch. Only when it is useless ('HEAD'/detached/empty) do we fall back to a branch
+ * the session CREATED — and ONLY if it created exactly ONE, so the value is
+ * unambiguous. A session that created several branches (or none) keeps its top-level
+ * value, so branch matching can never bind such a session to the wrong PR.
+ */
+export function resolveBranch(topLevel: string | null, created: ReadonlySet<string>): string | null {
+  if (!isUselessBranch(topLevel)) return topLevel;
+  if (created.size === 1) {
+    for (const only of created) return only;
+  }
+  return topLevel;
 }
