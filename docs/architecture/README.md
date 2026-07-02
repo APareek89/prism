@@ -9,6 +9,7 @@ Start here to navigate the design + build docs.
 | [`../testing.md`](../testing.md) | End-to-end testing path (reset → connect → PRs → run pipeline) |
 | [`../dogfooding.md`](../dogfooding.md) | How Prism measures its own development via PRs |
 | [`../scoring-model.md`](../scoring-model.md) | **Canonical scoring model (spec v3.0)** — two-index structure (MAIN Core-6 15/35/50 + separate HARNESS index), linkage engine, KPI reference w/ trust + cadence, diagnostic trees, coaching (Addendum B), estimations, build order. App still implements v1 — gap table at top |
+| [`../phase-2.md`](../phase-2.md) | **Phase-2 spec (org scaling)** — function packs (DevOps/DataOps/ML/QA; Product deferred), headcount-weighted org rollup, management dashboard, scope chain + RBAC, onboarding wizard (CSV→SCIM roster), Manager Enablement Index. Aligned 2026-07-02 — nothing implemented; Phase-1 = the v3.0 model |
 | [`ownership-map.md`](ownership-map.md) | **Single-owner rules** — read before adding files (migrations, clients, types, auth) |
 | [`../superpowers/specs/2026-06-30-prism-mvp-design.md`](../superpowers/specs/2026-06-30-prism-mvp-design.md) | The MVP design spec (divergences, milestones) |
 | [`../superpowers/specs/2026-06-30-prism-architecture.md`](../superpowers/specs/2026-06-30-prism-architecture.md) | Full file-by-file architecture |
