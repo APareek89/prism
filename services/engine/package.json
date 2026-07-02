@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "recompute": "node --env-file=../../.env.local scripts/recompute.mjs"
+    "recompute": "node --env-file=../../.env.local --import tsx src/cli.ts"
   },
   "dependencies": {
     "@prism/contract": "*",

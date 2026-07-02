@@ -170,8 +170,9 @@ const DEVS = [
   },
   {
     handle: 'nadia', name: 'Nadia Hassan', archetype: 'quota_capped', repo: 'acme/platform', team: 'Platform', seat: 'capped',
-    // Sessions only early-week — the seat cap hits mid-week (3-H3, org channel).
-    sessionDays: [0, 1, 5, 6, 7, 11, 12, 18, 19], extraPrDays: [4, 8, 13, 14, 15, 20, 21, 22, 25, 26],
+    // Sessions ONLY Mon–Wed (days 4/5/6, 11/12, 18/19, 25/26) — the seat cap
+    // hits mid-week, usage stops Thu/Fri (3-H3, org channel).
+    sessionDays: [4, 5, 6, 11, 12, 18, 19, 25, 26], extraPrDays: [0, 1, 8, 13, 14, 15, 20, 21, 22, 27],
     prCount: 8, aiPlan: ['pr_link', 'pr_link', 'pr_link', 'sha'], modules: () => 'src/billing',
     turns: 6, inScopeK: 360, cacheShare: 0.3, warmShare: 0.55, verifShare: 0.5,
     verifCats: ['V2', 'V3'], reviewPlan: [null, 'real', null, null],
