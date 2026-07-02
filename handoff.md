@@ -82,6 +82,8 @@ weights 10/25/40/25, retention/CFR/acceptance in the engine, multiplier scored, 
 in `lib/scoring` has been changed for v3.0. Do NOT partially implement; when the owner says
 "implement v3.0", follow scoring-model.md's open-decisions table and ship via dogfood PRs.
 
+**Phase-2 spec** (org scaling: function packs · org rollup · manager index · onboarding) → `docs/phase-2.md` — aligned 2026-07-02, not implemented.
+
 ## Next session — paste-ready prompt (for the owner)
 ```
 Continue the Prism project at /Users/anandpareek/Documents/prism.
