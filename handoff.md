@@ -38,6 +38,12 @@ any PR yet (session `branch=HEAD`, no sha/trailer on the session side), so every
   self employee **band L0 → L1**, `ai_assisted_pr_share` **0 → 100**, Effectiveness gets a real AI denominator,
   blame captured 724 AI lines.
 
+**Model alignment (2026-07-02, PR #11):** the scoring model is now canonically documented in
+**`docs/scoring-model.md`** — dimensions + MECE rule (file KPIs by measurement point, not cause),
+all 13 KPIs w/ formulas + anchors + live status, the 8 flagged anchors needing review, per-KPI
+diagnostic trees (H0 "is the number real?" first), control-group gap, telemetry unlock, privacy
+line, and the open-decisions backlog. Read it before changing any KPI/weight/anchor.
+
 **Still open (follow-ups, no code yet):**
 1. **Over-linking** — the repo-scoped `coauthor`@0.60 fallback cartesian-links every same-repo session↔PR
    (22 of 50 links; each of 10 PRs tied to all 5 sessions). Suppress it when `pr_link` already covers a PR +
@@ -197,6 +203,6 @@ verdicts work today.
 
 ## Commits (main)
 `5c6d1e7` spec → `816f330` architecture → `1eb3bf8` M0 → `a72694d` db fixes → `a452bb3` M1 →
-`41e2050`/`5ac1eff`/`02cd431` M2 → `9d98a71` M3+M4 → `35da916` M5 docs. Then dogfood PRs #1–#10 (#1–#6 reset/docs/PR-template/install-flow · #7 handoff connectors · #8 CLAUDE.md ·
-**#9 scoring+display wiring** · **#10 AI→PR link + migration 0033**).
+`41e2050`/`5ac1eff`/`02cd431` M2 → `9d98a71` M3+M4 → `35da916` M5 docs. Then dogfood PRs #1–#11 (#1–#6 reset/docs/PR-template/install-flow · #7 handoff connectors · #8 CLAUDE.md ·
+**#9 scoring+display wiring** · **#10 AI→PR link + migration 0033** · #11 scoring-model doc).
 Repo: `APareek89/prism` (private). Workflow going forward = PRs (see `docs/dogfooding.md`).
