@@ -43,6 +43,10 @@ any PR yet (session `branch=HEAD`, no sha/trailer on the session side), so every
 all 13 KPIs w/ formulas + anchors + live status, the 8 flagged anchors needing review, per-KPI
 diagnostic trees (H0 "is the number real?" first), control-group gap, telemetry unlock, privacy
 line, and the open-decisions backlog. Read it before changing any KPI/weight/anchor.
+**v1.1 (PR #12):** multiplier signal → OUT of the weighted index (now "AI Leaders" recognition +
+L5 gate; code change queued); **agent-harness KPI family proposed** — 13 verification-harness ·
+14 review-loop · 15 context-continuity (Goodhart guardrails documented). Model feedback loop runs
+in the **model lab** microsite at `~/Documents/prism-model-lab` (localhost:4600, feedback.json).
 
 **Still open (follow-ups, no code yet):**
 1. **Over-linking** — the repo-scoped `coauthor`@0.60 fallback cartesian-links every same-repo session↔PR

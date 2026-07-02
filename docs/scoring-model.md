@@ -4,6 +4,10 @@
 > **how each KPI is diagnosed**. Non-technical first; formulas and anchors match the engine
 > (`lib/scoring`) exactly. Keep this doc current whenever the model changes — weights, anchors,
 > KPI set, or diagnostic trees. Last aligned with the product owner: **2026-07-02**.
+>
+> **Change log:** v1 2026-07-02 initial alignment · v1.1 2026-07-02 — multiplier signal moved
+> **out of the weighted index** → "AI Leaders" recognition + L5 gate; **agent-harness KPI
+> family** (13–15) added to Proficiency as proposed.
 
 ---
 
@@ -24,7 +28,7 @@ computing or altering any number** (the determinism boundary).
 | **Usage** | Do you use AI? | Footprint — how often/deep AI shows up in the work | 10% |
 | **Efficiency** | What did output *cost*? | **During the work, before merge** — cycles, waste, tokens | 25% |
 | **Effectiveness** | Did what shipped *hold up*? | **After merge, in the real world** — reverts, survival, incidents | 40% |
-| **Proficiency** | Are you *compounding*? | Reusable artifacts — skills built, reused, spread to others | 25% |
+| **Proficiency** | Are you *compounding*? | Practices & assets that compound — skills, verification loops, review loops, context infrastructure | 25% |
 
 **The sorting rule (non-negotiable):** file each KPI by **where in the work's life the number
 is observed — never by what skill causes it**. Prompting well improves *every* KPI (fewer
@@ -84,7 +88,8 @@ repo-scoped, and the open follow-up is to suppress the coauthor fallback when an
    - **L0 gate:** AI-active share (AI-linked merged ÷ merged) **< 0.15 forces L0 Dormant**,
      whatever the L1 number.
    - **L5 gate:** the top band requires multiplier signal ≥ 1 (someone else uses your skill),
-     else caps at L4.
+     else caps at L4. *(v1.1: multiplier is a **gate + recognition signal** — no longer a
+     weighted KPI. See §6 Recognition.)*
 7. **Confidence**: too little signal → the index is suppressed and shown as *Insufficient*
    (publish floor 0.40). Small cohorts (N < 8) drop one confidence band.
 8. **Narration**: LangGraph agents write "what's going well / what to improve" strictly
@@ -96,7 +101,7 @@ L4 Power (70–84) → L5 Multiplier (85–100).
 **Worked examples:** AI-assisted share 10/10 = 100% → above the 1.0 target → **100 pts**.
 Average 6 turns per merged PR → between target 3 and ceiling 12 → (12−6)÷(12−3) → **67 pts**.
 
-## 6. KPI reference — the 13 measurements
+## 6. KPI reference — 12 weighted core + 3 proposed harness + 1 recognition signal
 
 Legend: **↑** higher is better · **↓** lower is better (inverted) · status = live / pending /
 dormant as of 2026-07-02.
@@ -129,13 +134,39 @@ are compared small-with-small, large-with-large — you can't win by only shippi
 | Change-failure rate | Did AI deploys cause incidents? | failed AI deploys ÷ AI deploys | ≥30% | ≤5% | ↓ | needs Sentry |
 | Defect-rework rate | Ship it, then patch it? | fix-type follow-ups on the same code ≤14d ÷ merged PRs | ≥30% | ≤5% | ↓ | live |
 
-### Proficiency ("Mastery & leverage") — are you compounding? (25%)
+### Proficiency ("Mastery & harness") — are you compounding? (25%)
 
-| KPI | Plain question | Formula (words) | 0 pts | 100 pts | Dir | Status |
-|---|---|---|---|---|---|---|
-| Effective skill leverage | Do saved skills actually *help*? | mean retention of skill-built PRs − mean retention of non-skill PRs (needs both groups; else null) | 0 edge | +20-pt edge | ↑ | pending |
-| Distinct skills authored | Know-how → reusable assets? | count of distinct skills authored | 0 | 3 | ↑ | live |
-| Multiplier signal | Does your leverage lift others? | authored skills used by ≥1 *other* person | 0 | 1 | ↑ | live; **gates L5** |
+Proficiency measures **harness maturity**: the practices and assets that make AI work compound —
+reusable skills, verification loops before handoff, self-review before human review, and durable
+context across sessions. These are *practice-adoption* measures (is the technique in use?), not
+cost (Efficiency) and not outcome (Effectiveness) — outcomes stay where they are; harness KPIs
+measure whether the practices that *produce* good outcomes are installed.
+
+| # | KPI | Plain question | Formula (words) | 0 pts | 100 pts | Dir | Status |
+|---|---|---|---|---|---|---|---|
+| 11 | Effective skill leverage | Do saved skills actually *help*? | mean retention of skill-built PRs − mean retention of non-skill PRs (needs both groups; else null) | 0 edge | +20-pt edge | ↑ | pending |
+| 12 | Distinct skills authored | Know-how → reusable assets? | count of distinct skills authored | 0 | 3 | ↑ | live |
+| 13 | **Verification harness rate** | Does AI verify before handing over? | AI-built merged PRs whose session ran tests/build/lint **before the PR opened** ÷ AI-built merged PRs | ≤30% | ≥80% | ↑ | **proposed** (session logs have tool calls — parser extension) |
+| 14 | **Review-loop rate** | Is there a critique pass before human review? | AI-built merged PRs with an explicit pre-PR review pass (review skill / review subagent / diff-critique) ÷ AI-built merged PRs | ≤20% | ≥70% | ↑ | **proposed** (partially detectable from skill/subagent events) |
+| 15 | **Context continuity rate** | Do sessions start warm or from scratch? | sessions in connected repos that loaded durable context (CLAUDE.md / handoff / memory read at start) ÷ those sessions; corroborated by session-start cache-read share and first-prompt length | ≤30% | ≥80% | ↑ | **proposed** (proxy measurable today; clean with telemetry) |
+
+**Anti-gaming (Goodhart) rule for harness KPIs:** practice-adoption metrics invite box-ticking,
+so credit requires *real* execution — verification counts only if the test/build actually ran and
+produced output (non-zero duration, exit status captured); a review pass counts only if it was
+followed by at least one diff change or an explicit "no findings" record; a context read counts
+only at session start, not an incidental file open. Pair harness KPIs with Outcomes in narration:
+"harness up, outcomes flat" is itself a diagnostic.
+
+#### Recognition signals — outside the weighted index (v1.1)
+
+| Signal | Meaning | Use |
+|---|---|---|
+| **Multiplier signal** | your authored skills used by ≥1 *other* person | **"AI Leaders"** recognition surface (leaderboard / award / profile badge) + still the **L5 band gate**. Not part of any weighted score. Kept here as a KPI for later reconsideration. |
+
+Rationale: a multiplier is a *distinction*, not a gradient — most engineers legitimately sit at 0
+and that's fine; averaging it into a score punishes the majority for not being exceptional.
+As recognition it motivates without distorting; as the L5 gate it still means the top band must
+be *earned* by lifting others.
 
 ## 7. Anchor review checklist (open decision)
 
@@ -152,7 +183,12 @@ makes everyone look better or worse than reality):
 | Change-failure rate | target 5% / ceiling 30% |
 | Defect-rework rate | target 5% / ceiling 30% |
 | Distinct skills authored | 0 → 3 saturates |
-| Multiplier signal | 0 → 1 saturates |
+| Verification harness rate *(proposed)* | floor 30% / target 80% |
+| Review-loop rate *(proposed)* | floor 20% / target 70% |
+| Context continuity rate *(proposed)* | floor 30% / target 80% |
+
+Recognition (not weighted): multiplier signal — 0 → 1 saturates the **L5 gate**; surfaced as
+"AI Leaders" recognition rather than scored.
 
 Pinned (PRD §4.4): AI-assisted share (.5→1.0) · iterations (3→12) · retention (.2→.7) ·
 tokens/PR (30k→90k) · skill leverage (0→+0.2).
@@ -330,7 +366,40 @@ deeper GitHub/CI pull (reviews, labels, checks) · `[audit]` human spot-check of
 - **H3 — Feature unknown**
   - Data: cohort with zero skill usage AND zero authorship. `[have]` + onboarding check
 
-**13 · Multiplier signal** — 0 = nobody benefits from your assets
+**13 · Verification harness rate** — low = AI hands over unverified work
+
+- **H0 — Verification ran but wasn't captured** (tests run in CI only, or manually outside the session)
+  - Data: CI first-push status vs session tool calls for the same PR; if CI passes first-try with no session verification, capture is the gap. `[scm+]` + `[have]` (session tool events)
+- **H1 — Nothing to run: repo has no test infrastructure**
+  - Data: test-file presence, test script in package.json/CI config, per-repo split of the rate. `[scm+]`
+- **H2 — Habit gap: AI never instructed to verify** (no CLAUDE.md rule, no verify skill)
+  - Data: CLAUDE.md presence + "verify/test before PR" instruction flags vs per-repo rate. `[have]`
+- **H3 — Speed pressure: verification skipped on rushed work**
+  - Data: rate vs PR size, time-of-day, release-week clustering. `[have]`
+
+**14 · Review-loop rate** — low = first human contact is the raw AI draft
+
+- **H0 — Review happens invisibly** (developer reviews locally; review pass not detectable as a distinct event)
+  - Data: session patterns before PR-open (diff re-reads, critique prompts) — metadata only. `[have]` approx / `[telemetry]` clean
+- **H1 — No review tooling: no review skill/command exists to invoke**
+  - Data: presence of review skills in the org's skill set; invocation counts. `[have]`
+- **H2 — Perceived redundant: "the human reviewer will catch it"**
+  - Data: human review burden on PRs with vs without an AI review pass (comment count, review rounds, time-to-approve). `[scm+]` — if the loop reduces human burden, the perception is wrong and provable
+- **H3 — Review pass exists but is theater** (runs, finds nothing, changes nothing — ever)
+  - Data: share of review passes followed by a diff change or a recorded finding. `[have]` once captured + `[audit]`
+
+**15 · Context continuity rate** — low = every session starts cold, knowledge evaporates
+
+- **H0 — Continuity exists but is manual** (dev pastes context into the first prompt instead of files)
+  - Data: first-prompt length distribution (very long first prompts = manual re-explanation); session-start cache-read share. `[have]`
+- **H1 — No durable context files** (no CLAUDE.md / handoff / memory in the repo)
+  - Data: repo presence scan of context files. `[scm+]` / `[have]`
+- **H2 — Files exist but stale or unread**
+  - Data: session read-events of context files at start; file last-modified vs recent sessions. `[have]` approx / `[telemetry]` clean
+- **H3 — Anti-pattern: one endless session instead of resumable chunks** (context bloat, compaction thrash)
+  - Data: session length distribution, cache-creation ÷ input ratio (compaction signal). `[have]`
+
+**R1 · Multiplier signal (recognition — out of the weighted index, v1.1)** — 0 = nobody benefits from your assets yet
 
 - **H0 — Cross-person usage not attributable** (local capture only knows "self")
   - Data: skill-invocation events with user identity. `[telemetry]` (hard prerequisite)
@@ -370,3 +439,7 @@ areas" from correlational into causal.
 | 5 | Org **telemetry** design (collector + managed config + account→employee mapping) | open |
 | 6 | Suppress coauthor fallback when `pr_link` covers a PR; de-dupe cwd-split sessions | queued (handoff) |
 | 7 | Retention premature-0 → pending/null until 30d maturity | queued (handoff) |
+| 8 | **Implement multiplier removal in code**: drop from INTRA_WEIGHTS/L2 math, keep L5 gate + data capture; build "AI Leaders" recognition surface | decided v1.1 — not yet coded |
+| 9 | **Implement harness KPIs 13–15**: parser extension for tool-call/verification events, review-pass detection, context-read detection; add anchors | proposed v1.1 — pending feedback in the model lab |
+| 10 | Possible merge of 13+14 into one "pre-handoff harness rate" if they prove redundant | open — decide after first real data |
+| 11 | Intra-dimension weights for the new 4-KPI Proficiency (equal weights until calibration?) | open |
