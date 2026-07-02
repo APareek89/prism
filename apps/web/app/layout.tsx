@@ -6,7 +6,6 @@
 
 import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk, IBM_Plex_Sans, JetBrains_Mono } from 'next/font/google';
-import { AppShell } from '@/components/layout/AppShell';
 import './globals.css';
 
 // Font CSS variables. globals.css :root sets --disp/--body/--mono to the family
@@ -63,9 +62,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }
         `}</style>
       </head>
-      <body>
-        <AppShell>{children}</AppShell>
-      </body>
+      {/*
+        AppShell (the v1 sidebar chrome) moved into the v1 route layouts —
+        (views)/admin/auth — so the /v3 preview renders its own standalone shell.
+      */}
+      <body>{children}</body>
     </html>
   );
 }

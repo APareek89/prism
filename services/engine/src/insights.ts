@@ -178,7 +178,9 @@ export function deriveInsights(
     }
     if (selfCaught.length > 0) {
       out.push({
-        kpi_id: 'revert', hypothesis: 'H2', channel: 'rec',
+        // 'ROUTE' not 'H2': who-caught routing is the v2.2 DECISION, not a lab
+        // hypothesis row — and it must not collide with the H2 missing-tests key.
+        kpi_id: 'revert', hypothesis: 'ROUTE', channel: 'rec',
         title: `${selfCaught.length} self-caught revert${selfCaught.length > 1 ? 's' : ''} — catchable before the PR`,
         body: `You caught and reverted PR #${selfCaught.map((r) => r.number).join(', #')} yourself — it still counts (merged is merged), but the route is verification coaching: a pre-PR harness run (KPI 13) would have caught it in-session, before review ever saw it.`,
         magnitude: { self_caught: selfCaught.length },

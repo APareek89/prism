@@ -5,9 +5,12 @@
 // M1/M2; M0 renders the structure + placeholder cards.
 
 import type { ReactNode } from 'react';
+import { AppShell } from '@/components/layout/AppShell';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>{children}</div>
+    <AppShell>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>{children}</div>
+    </AppShell>
   );
 }

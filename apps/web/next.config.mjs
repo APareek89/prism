@@ -9,6 +9,7 @@ const nextConfig = {
     '@langchain/core',
     '@langchain/anthropic',
     'inngest',
+    'pg',
   ],
   // Workspace packages ship as TypeScript source; Next transpiles them.
   transpilePackages: ['@prism/engine', '@prism/contract'],
