@@ -2,7 +2,6 @@ import { MetaStrip } from '@/components/layout/MetaStrip';
 import { ViewBody } from '@/components/layout/ViewBody';
 import { activePin, teamRows } from '@/lib/v3/read';
 import { TeamTable, type TeamTableRow } from '@/components/v3/TeamTable';
-import { V3Nav } from '@/components/v3/Nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +35,7 @@ export default async function V3TeamPage() {
         who={`${vm.length} developers`}
         isDemo
         showPeriodToggle={false}
-        actions={<V3Nav />}
+        
       />
       <ViewBody>
         <div className="card">

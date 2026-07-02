@@ -2,16 +2,51 @@
 //
 // The left rail: prism logo + tagline + primary nav. Client component (uses
 // usePathname for active state). Nav items come from lib/nav/routes.ts.
+// The v3 preview group renders beneath the primary nav with the same link
+// treatment and a .grp-style section label (dummy-data enhancement).
 
 'use client';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { PrismLogo } from '@/components/brand/PrismLogo';
-import { NAV_ITEMS, isActive } from '@/lib/nav/routes';
+import { NAV_ITEMS, V3_NAV_ITEMS, activeItem, isActive, type NavItem } from '@/lib/nav/routes';
+
+function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? 'page' : undefined}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '9px 12px',
+        borderRadius: 'var(--radius-sm)',
+        fontSize: 13.5,
+        fontWeight: active ? 600 : 500,
+        color: active ? 'var(--ink)' : 'var(--mut)',
+        background: active ? 'var(--panel2)' : 'transparent',
+        border: `1px solid ${active ? 'var(--line2)' : 'transparent'}`,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: active ? 'var(--usage)' : 'var(--mut2)',
+        }}
+      />
+      {item.label}
+    </Link>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname() ?? '/';
+  const v3Active = activeItem(pathname, V3_NAV_ITEMS);
 
   return (
     <aside
@@ -42,39 +77,26 @@ export function Sidebar() {
 
       {/* nav */}
       <nav aria-label="Primary" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(pathname, item);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? 'page' : undefined}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '9px 12px',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: 13.5,
-                fontWeight: active ? 600 : 500,
-                color: active ? 'var(--ink)' : 'var(--mut)',
-                background: active ? 'var(--panel2)' : 'transparent',
-                border: `1px solid ${active ? 'var(--line2)' : 'transparent'}`,
-              }}
-            >
-              <span
-                aria-hidden
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: active ? 'var(--usage)' : 'var(--mut2)',
-                }}
-              />
-              {item.label}
-            </Link>
-          );
-        })}
+        {NAV_ITEMS.map((item) => (
+          <NavLink key={item.href} item={item} active={isActive(pathname, item)} />
+        ))}
+
+        {/* v3 preview group — the .grp section-label treatment */}
+        <span
+          style={{
+            color: 'var(--mut2)',
+            fontSize: 10,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            margin: '18px 12px 6px',
+            fontFamily: 'var(--mono)',
+          }}
+        >
+          v3 preview · demo
+        </span>
+        {V3_NAV_ITEMS.map((item) => (
+          <NavLink key={item.href} item={item} active={v3Active?.href === item.href} />
+        ))}
       </nav>
 
       <div style={{ marginTop: 'auto', padding: '0 8px' }}>

@@ -5,7 +5,6 @@ import {
   activePin, allDevelopers, coachingEventsFor, developerByHandle, developerDetail, userContextFor,
 } from '@/lib/v3/read';
 import { MyView } from '@/components/v3/MyView';
-import { V3Nav } from '@/components/v3/Nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +51,7 @@ export default async function V3MePage({ searchParams }: { searchParams: Promise
         who="Private to you"
         isDemo
         showPeriodToggle={false}
-        actions={<V3Nav />}
+        
       />
       <ViewBody>
         <MyView

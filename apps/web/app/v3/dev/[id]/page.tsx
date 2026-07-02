@@ -4,7 +4,6 @@ import { MetaStrip } from '@/components/layout/MetaStrip';
 import { ViewBody } from '@/components/layout/ViewBody';
 import { activePin, developerByHandle, developerDetail } from '@/lib/v3/read';
 import { IndexHero, InsightList, KpiGrid, RecList } from '@/components/v3/detail';
-import { V3Nav } from '@/components/v3/Nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +26,7 @@ export default async function V3DevPage({ params }: { params: Promise<{ id: stri
         who={detail.dev.team}
         isDemo
         showPeriodToggle={false}
-        actions={<V3Nav />}
+        
       />
       <ViewBody>
         <Link href="/v3" className="backbtn" style={{ alignSelf: 'flex-start', textDecoration: 'none', marginBottom: 0 }}>
