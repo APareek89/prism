@@ -251,9 +251,33 @@ The aligned defaults — change only via the open-decisions process:
 > dollars because they are **billed** — invoices and seat contracts are fetched facts. The rule
 > was never "no dollars"; it is "no invented dollars."
 >
-> **Interactive KPI spec (demo numbers):** `prism-model-lab/public/run-cost.html` — served on
-> the lab at `localhost:4600/run-cost.html` and the shared copy at
+> **Interactive spec (4 tabs: Model + Journey per bucket, demo numbers):**
+> `prism-model-lab/public/run-cost.html` — `localhost:4600/run-cost.html` and the shared copy at
 > https://prism-model-lab-anand-pareeks-projects.vercel.app/run-cost.html
+
+### The L1/L2 structure (v1.2 — same template as the workforce model)
+
+**2a · L1 = Run-Cost Health Index (0–100)** = 0.20 · **Visibility** (attribution coverage —
+a GATE: below 60 the other L2s publish low-confidence; env-key separation; untagged share)
++ 0.45 · **Serving efficiency** (cost/1k uses · calls-per-use · cache hit · model mix ·
+prompt-size trend · cost per successful outcome) + 0.35 · **Monetization alignment**
+(paid-serving share · acquisition share + CAC lens · unmonetized waste share). Published next
+to the raw billed $/month, never instead of it. Weights/anchors flagged — calibrate on the
+first real bill.
+
+**2b · L1 = Work-Cost Efficiency Index (0–100)** = 0.30 · **Spend hygiene** (dormant seat
+rate · cost per active user · tool redundancy) + 0.45 · **Process efficiency** (unit process
+cost — the joint KPI · within-team before/after throughput · quality guard) + 0.25 ·
+**Adoption alignment** (adoption×outcome quadrant · spend-vs-delta per function · the
+workforce join: training problem vs procurement problem).
+
+**The company journey (each stage = what you can confidently say + one unlock to the next):**
+2a: ① one number (invoice ✅) → ① see it — **build-vs-prod live breakup: ✅ confidently,
+per-key/project daily from provider usage APIs; if envs share keys, the unlock is a key-split
+(hours)** → ② place it (gateway tags → feature×model×env ledger) → ③ judge it (unit economics)
+→ ④ serve-who (paid/acquisition/waste + CAC lens) → ⑤ move it (actions verified on the next
+bill). 2b: invoice pile → seat truth (SSO ✅) → tool map → unit costs → causal check
+(within-team before/after) → portfolio loop (keep · train · reassess · cancel, invoice-verified).
 
 ### 2a · Run cost — the owner's two keys, formalized
 
@@ -325,6 +349,7 @@ both the spend side and the workforce/harness indexes.
 
 *Changelog: v1 · 2026-07-02 — initial Phase-2 alignment with the product owner (function packs ·
 org rollup · management dashboard · scope chain · onboarding · Manager Enablement Index).
+v1.2 · 2026-07-02 — Bucket-2 restructured to L1/L2 + journey (run-cost.html v2).
 v1.1 · 2026-07-02 — Bucket-2 section added (2a run-cost + 2b work-cost KPI spec, billed-dollars
 rule, gateway-tagging prerequisite, demo page `run-cost.html`).
 Nothing implemented; Phase-1 = the v3.0 engineering model in `scoring-model.md`.*
