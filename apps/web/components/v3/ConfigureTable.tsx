@@ -1,7 +1,7 @@
 'use client';
 
-// Configure tab — the whole model rendered FROM the DB (v3.kpi_catalog +
-// v3.data_points + the active v3.config_versions row).
+// Configure tab — the app's card/table treatment. The whole model rendered FROM
+// the DB (v3.kpi_catalog + v3.data_points + the active v3.config_versions row).
 //   · edit weights inline
 //   · delete (disable) a KPI → proportional redistribution within its index
 //     (engine's disableKpi — the same pure function the tests cover)
@@ -24,6 +24,11 @@ interface Props {
 
 const TAG_ICON: Record<string, string> = { now: '✅', setup: '🔧', est: '📐', no: '🚫' };
 
+const DEFAULT_WEIGHTS: Record<string, number> = {
+  ai_share: 7.5, cadence: 7.5, iterations: 17.5, tokens: 17.5, revert: 25, rework: 25,
+  skills_authored: 25, verification: 25, review_loop: 25, continuity: 25,
+};
+
 export function ConfigureTable({ catalog, dataPoints, activeVersion, activeNote, initialConfig, asOf }: Props) {
   const [config, setConfig] = useState<IndexConfig>(initialConfig);
   const [saving, setSaving] = useState(false);
@@ -45,15 +50,9 @@ export function ConfigureTable({ catalog, dataPoints, activeVersion, activeNote,
 
   const setWeight = (kpiId: KpiId, w: number) =>
     setConfig((c) => ({ ...c, weights: { ...c.weights, [kpiId]: w } }));
-
   const remove = (kpiId: KpiId) => setConfig((c) => disableKpi(catalog, c, kpiId));
-  const restore = (kpiId: KpiId) => {
-    const defaults: Record<string, number> = {
-      ai_share: 7.5, cadence: 7.5, iterations: 17.5, tokens: 17.5, revert: 25, rework: 25,
-      skills_authored: 25, verification: 25, review_loop: 25, continuity: 25,
-    };
-    setConfig((c) => enableKpi(catalog, c, kpiId, defaults[kpiId] ?? 10));
-  };
+  const restore = (kpiId: KpiId) =>
+    setConfig((c) => enableKpi(catalog, c, kpiId, DEFAULT_WEIGHTS[kpiId] ?? 10));
 
   const save = async () => {
     setSaving(true);
@@ -81,42 +80,57 @@ export function ConfigureTable({ catalog, dataPoints, activeVersion, activeNote,
       const isDisabled = config.disabled.includes(k.kpi_id);
       const weight = config.weights[k.kpi_id];
       return (
-        <tr key={k.kpi_id} className={isDisabled ? 'v3-row-disabled' : ''}>
-          <td><b>{k.num}</b></td>
+        <tr key={k.kpi_id} style={isDisabled ? { opacity: 0.45 } : undefined}>
+          <td className="mono muted2">{k.num}</td>
           <td>
-            <b>{k.name}</b>
-            <div className="v3-mut v3-small">{k.question}</div>
+            <span className="mem" style={{ alignItems: 'flex-start' }}>
+              <span>
+                <b>{k.name}</b>
+                <small>{k.question}</small>
+              </span>
+            </span>
           </td>
-          <td className="v3-mut v3-small">{k.index_kind}<br />{k.dimension}</td>
           <td>
-            <div className="v3-inputs-list">
+            <span className="chiplist" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 3 }}>
+              <span className="chip">{k.index_kind}</span>
+              <span className="chip">{k.dimension}</span>
+            </span>
+          </td>
+          <td>
+            <span className="muted2 mono" style={{ fontSize: 11, lineHeight: 1.6, display: 'block' }}>
               {k.data_point_ids.map((id) => {
                 const p = pointsById.get(id);
-                return <div key={id}>{TAG_ICON[p?.fetch_tag ?? 'now']} {p?.name ?? id}</div>;
+                return <span key={id} style={{ display: 'block' }}>{TAG_ICON[p?.fetch_tag ?? 'now']} {p?.name ?? id}</span>;
               })}
-            </div>
+            </span>
           </td>
-          <td className="v3-small" style={{ maxWidth: 330, lineHeight: 1.5 }}>{k.formula_text}</td>
+          <td style={{ maxWidth: 320 }}>
+            <span className="muted" style={{ fontSize: 12, lineHeight: 1.55 }}>{k.formula_text}</span>
+          </td>
           <td>
             {index === 'diagnostic' ? (
-              <span className="v3-chip tier">tier-badged · unweighted</span>
+              <span className="chip" style={{ color: 'var(--eff)' }}>tier-badged · unweighted</span>
             ) : isDisabled ? (
-              <span className="v3-chip bad">deleted</span>
+              <span className="stchip st-dismiss">deleted</span>
             ) : (
               <input
-                className="v3-winput"
                 type="number" min={0} max={100} step={0.5}
                 value={weight ?? 0}
                 onChange={(e) => setWeight(k.kpi_id, Number(e.target.value))}
                 aria-label={`weight for ${k.name}`}
+                className="mono"
+                style={{
+                  width: 66, background: 'var(--panel2)', color: 'var(--ink)',
+                  border: '1px solid var(--line2)', borderRadius: 7, padding: '6px 8px', fontSize: 12.5,
+                }}
               />
             )}
           </td>
           <td>
             {index === 'diagnostic' ? null : isDisabled ? (
-              <button className="v3-btn" onClick={() => restore(k.kpi_id)}>Restore</button>
+              <button type="button" className="linkbtn" onClick={() => restore(k.kpi_id)}>restore</button>
             ) : (
-              <button className="v3-btn" onClick={() => remove(k.kpi_id)}>Delete</button>
+              <button type="button" className="linkbtn" onClick={() => remove(k.kpi_id)}>delete</button>
             )}
           </td>
         </tr>
@@ -124,48 +138,64 @@ export function ConfigureTable({ catalog, dataPoints, activeVersion, activeNote,
     });
 
   const head = (
-    <tr>
-      <th className="nosort">#</th><th className="nosort">KPI</th><th className="nosort">Index · dim</th>
-      <th className="nosort">Input data points</th><th className="nosort">Calculation logic</th>
-      <th className="nosort">Weight</th><th className="nosort" />
-    </tr>
+    <thead>
+      <tr>
+        <th>#</th><th>KPI</th><th>Index · dim</th><th>Input data points</th>
+        <th>Calculation logic</th><th>Weight</th><th aria-label="actions" />
+      </tr>
+    </thead>
+  );
+
+  const sumPill = (label: string, sum: number) => (
+    <span className="pill">
+      {label} weights sum:{' '}
+      <b style={{ color: Math.abs(sum - 100) < 0.51 ? 'var(--good)' : 'var(--bad)' }}>{sum.toFixed(1)}</b> / 100
+    </span>
   );
 
   return (
     <>
-      <div className="v3-panel">
-        <h2>
-          MAIN index — Core-6
-          <span className="hint">active: config v{activeVersion} ({activeNote}) · as-of {asOf ?? '—'}</span>
-        </h2>
-        <table className="v3-table"><thead>{head}</thead><tbody>{renderRows('main')}</tbody></table>
-        <div className="v3-sumline">
-          Main weights sum: <b className={Math.abs(sums.main - 100) < 0.51 ? 'ok' : 'err'}>{sums.main.toFixed(1)}</b> / 100
+      <div className="card">
+        <div className="cardhead">
+          <h3>MAIN index — Core-6</h3>
+          <span className="sub">active: config v{activeVersion} ({activeNote}) · as-of {asOf ?? '—'}</span>
         </div>
+        <table>{head}<tbody>{renderRows('main')}</tbody></table>
+        <div className="daterow" style={{ marginTop: 12, marginBottom: 0 }}>{sumPill('main', sums.main)}</div>
       </div>
 
-      <div className="v3-panel">
-        <h2>HARNESS index — separate, own confidence, no bands</h2>
-        <table className="v3-table"><thead>{head}</thead><tbody>{renderRows('harness')}</tbody></table>
-        <div className="v3-sumline">
-          Harness weights sum: <b className={Math.abs(sums.harness - 100) < 0.51 ? 'ok' : 'err'}>{sums.harness.toFixed(1)}</b> / 100
+      <div className="card">
+        <div className="cardhead">
+          <h3>HARNESS index</h3>
+          <span className="sub">separate · own confidence · no bands · never mixes into main</span>
         </div>
+        <table>{head}<tbody>{renderRows('harness')}</tbody></table>
+        <div className="daterow" style={{ marginTop: 12, marginBottom: 0 }}>{sumPill('harness', sums.harness)}</div>
       </div>
 
-      <div className="v3-panel">
-        <h2>Diagnostics — scored, tier-badged, never weighted</h2>
-        <table className="v3-table"><thead>{head}</thead><tbody>{renderRows('diagnostic')}</tbody></table>
+      <div className="card">
+        <div className="cardhead">
+          <h3>Diagnostics</h3>
+          <span className="sub">scored + tier-badged · never weighted · KPI 9 promotes after one clean T1 month</span>
+        </div>
+        <table>{head}<tbody>{renderRows('diagnostic')}</tbody></table>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-        <button className="v3-btn primary" disabled={!dirty || !sumsOk || saving} onClick={save}>
+      <div className="daterow">
+        <button
+          type="button"
+          className="linkbtn"
+          style={{ color: 'var(--ink)', borderColor: 'var(--usage)', padding: '9px 16px' }}
+          disabled={!dirty || !sumsOk || saving}
+          onClick={save}
+        >
           {saving ? 'Saving + recomputing…' : `Save as config v${activeVersion + 1} & recompute`}
         </button>
-        {!sumsOk ? <span className="v3-chip bad">each index must sum to 100 before saving</span> : null}
-        {!dirty ? <span className="v3-chip">no changes</span> : null}
-        {error ? <span className="v3-chip bad">{error}</span> : null}
+        {!sumsOk ? <span className="stchip st-prog">each index must sum to 100 before saving</span> : null}
+        {!dirty ? <span className="pill">no changes</span> : null}
+        {error ? <span className="stchip st-prog">{error}</span> : null}
+        {flash ? <span className="stchip st-adopted">{flash}</span> : null}
       </div>
-      {flash ? <div className="v3-flash">{flash}</div> : null}
     </>
   );
 }

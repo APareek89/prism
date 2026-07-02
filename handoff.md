@@ -122,8 +122,17 @@ both engine (`run.ts`) and web (`lib/v3/db.ts`) register type parsers (ISO strin
 creating a SECOND `pg.Client` inside a Next dev route hangs at teardown — routes must reuse the
 pool (`recomputeWith(client)`) · persist is batched (chunked multi-row inserts; was ~1000 round
 trips ≈ 90s, now ~5s) · the Claude-Preview browser mis-renders streamed Suspense on this app —
-use the Playwright MCP for browser verification · AppShell moved from root layout into
-(views)/admin/auth group layouts so `/v3` renders standalone (v1 pages pixel-identical).
+use the Playwright MCP for browser verification.
+
+**UI rule (owner correction, 2026-07-02): the v3 preview uses the EXISTING app UI — no new
+design.** /v3 renders inside the standard AppShell (root layout untouched, exactly as on main)
+and is built ONLY from globals.css classes + existing components: MetaStrip/ViewBody chrome,
+`.seg` section nav, `.note` for the DEMO DATA banner, `.mem/.av` roster table, `.hero/.idxcard/
+.bignum` index hero, `.subrow` spectrum bars, `.insitem`+`.tag2` insights, `.pritem/.prtag` recs,
+`.commlog/.commitem/.stchip` coaching stream, `.course` cards, `.wellitem` improvement areas,
+`.linkbtn/.pill` controls. v3 band NAMES (Dormant/Basic/Productive/Workflow/Power/Multiplier)
+ride in the v1 chip style; numeric confidence maps to the v1 ConfidenceChip bands. Do not add
+bespoke stylesheets to /v3.
 
 ## Next session — paste-ready prompt (for the owner)
 ```

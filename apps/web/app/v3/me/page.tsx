@@ -1,8 +1,11 @@
 import { COURSE_CATALOG } from '@prism/engine';
+import { MetaStrip } from '@/components/layout/MetaStrip';
+import { ViewBody } from '@/components/layout/ViewBody';
 import {
   activePin, allDevelopers, coachingEventsFor, developerByHandle, developerDetail, userContextFor,
 } from '@/lib/v3/read';
 import { MyView } from '@/components/v3/MyView';
+import { V3Nav } from '@/components/v3/Nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,18 +45,34 @@ export default async function V3MePage({ searchParams }: { searchParams: Promise
     .map((c) => ({ ...c, recommended: c.targets.some((t) => weakKpis.has(t)) }));
 
   return (
-    <MyView
-      pin={{ version: pin.version, date: pin.date }}
-      dev={{ id: dev.id, handle: dev.handle, name: dev.name, archetype: dev.archetype }}
-      devOptions={devs.map((d) => ({ handle: d.handle, name: d.name }))}
-      main={detail.main}
-      harness={detail.harness}
-      insights={detail.insights}
-      recommendations={detail.recommendations}
-      coaching={coaching}
-      courses={courses}
-      areas={areas}
-      userContext={userContext}
-    />
+    <>
+      <MetaStrip
+        title={`My view — ${dev.name}`}
+        subtitle={`${dev.archetype.replaceAll('_', ' ')} · config v${pin.version} · as-of ${pin.date ?? '—'}`}
+        who="Private to you"
+        isDemo
+        showPeriodToggle={false}
+        actions={<V3Nav />}
+      />
+      <ViewBody>
+        <MyView
+          pin={{ version: pin.version, date: pin.date }}
+          dev={{ id: dev.id, handle: dev.handle, name: dev.name, archetype: dev.archetype }}
+          devOptions={devs.map((d) => ({ handle: d.handle, name: d.name }))}
+          main={detail.main}
+          harness={detail.harness}
+          insights={detail.insights}
+          recommendations={detail.recommendations}
+          coaching={coaching}
+          courses={courses}
+          areas={areas}
+          userContext={userContext}
+        />
+        <div className="foot">
+          Your view is private. Managers see aggregates and anonymized coaching themes, not your
+          raw session or coaching stream.
+        </div>
+      </ViewBody>
+    </>
   );
 }

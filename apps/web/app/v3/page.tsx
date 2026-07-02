@@ -1,5 +1,8 @@
+import { MetaStrip } from '@/components/layout/MetaStrip';
+import { ViewBody } from '@/components/layout/ViewBody';
 import { activePin, teamRows } from '@/lib/v3/read';
 import { TeamTable, type TeamTableRow } from '@/components/v3/TeamTable';
+import { V3Nav } from '@/components/v3/Nav';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,15 +30,23 @@ export default async function V3TeamPage() {
   }));
   return (
     <>
-      <h1 className="v3-h1">Function dashboard — both indexes, {vm.length} developers</h1>
-      <p className="v3-sub">
-        MAIN index = Usage 15 · Efficiency 35 · Outcomes 50 over the Core-6. HARNESS index = KPIs
-        12–15, scored separately, no bands — it never mixes into the main number. Click a developer
-        to drill into KPIs, insights and recommendations. Config v{pin.version}, as-of {pin.date ?? '—'}.
-      </p>
-      <div className="v3-panel">
-        <TeamTable rows={vm} />
-      </div>
+      <MetaStrip
+        title="Function — v3 preview"
+        subtitle={`config v${pin.version} · as-of ${pin.date ?? '—'}`}
+        who={`${vm.length} developers`}
+        isDemo
+        showPeriodToggle={false}
+        actions={<V3Nav />}
+      />
+      <ViewBody>
+        <div className="card">
+          <div className="cardhead">
+            <h3>Both indexes, per developer</h3>
+            <span className="sub">MAIN 15/35/50 over Core-6 · HARNESS separate (12–15) · click a row to drill in</span>
+          </div>
+          <TeamTable rows={vm} />
+        </div>
+      </ViewBody>
     </>
   );
 }

@@ -1,70 +1,111 @@
-// Server-safe rendering blocks shared by the drill-down and My View Tab 1.
+// Server-safe rendering blocks shared by the drill-down and My View Tab 1 —
+// built entirely from the approved design system: .hero/.idxcard/.bignum/.lvl,
+// .subrow spectrum bars, .row .card grids, .insitem insight list, .pritem recs.
 
 import type { IndexDailyRow, InsightRow, KpiDailyRow, RecommendationRow } from '@prism/contract';
-import { BandChip, ConfidenceChip, CHANNEL_LABEL } from './chips';
+import { DIMENSION_HUES } from '@/app/tokens';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { CHANNEL_LABEL, CHANNEL_TAG2, V3BandChip, V3ConfidenceChip } from './chips';
 
-const DIM_HUES: Record<string, string> = { usage: '#5b8def', efficiency: '#2dd4bf', outcomes: '#f5a524' };
+const DIM_LABELS: Record<string, string> = { usage: 'Usage', efficiency: 'Efficiency', outcomes: 'Outcomes' };
+const DIM_HUES: Record<string, string> = {
+  usage: DIMENSION_HUES.usage,
+  efficiency: DIMENSION_HUES.efficiency,
+  outcomes: DIMENSION_HUES.effectiveness,
+};
 
 export function IndexHero({ main, harness }: { main: IndexDailyRow | null; harness: IndexDailyRow | null }) {
   return (
-    <div className="v3-hero">
-      <div className="v3-panel" style={{ marginBottom: 0 }}>
-        <h2>MAIN index <span className="hint">Usage 15 · Efficiency 35 · Outcomes 50</span></h2>
-        <div className="v3-hero-score">{main?.score === null || !main ? '—' : main.score.toFixed(1)}</div>
-        <div style={{ margin: '10px 0 6px' }}>
-          <BandChip band={main?.band ?? null} />{' '}
-          {main ? <ConfidenceChip confidence={main.confidence} suppressed={main.score === null} /> : null}
-          {main?.gates.l0_forced ? <span className="v3-chip bad">L0 gate: AI share &lt; 15%</span> : null}
-          {main?.gates.l5_capped ? <span className="v3-chip warn">L5 capped: no multiplier signal</span> : null}
-          {(main?.gates.multiplier_signal ?? 0) > 0 ? <span className="v3-chip good">multiplier ×{main!.gates.multiplier_signal}</span> : null}
+    <div className="hero" style={{ gridTemplateColumns: '300px 1fr', marginBottom: 0 }}>
+      {/* MAIN index — the v1 .idxcard treatment */}
+      <div className="card idxcard">
+        <div>
+          <div className="eyebrow">Main index · usage 15 · efficiency 35 · outcomes 50</div>
+          <div className="bignum">
+            {main?.score === null || !main ? '—' : main.score.toFixed(1)}
+            <span> /100</span>
+          </div>
         </div>
+        <div className="lvl" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <V3BandChip band={main?.band ?? null} />
+            {main ? <V3ConfidenceChip confidence={main.confidence} suppressed={main.score === null} /> : null}
+          </span>
+          {main?.gates.l0_forced ? (
+            <span>gate: <b>AI share &lt; 15% forces L0 · Dormant</b></span>
+          ) : null}
+          {main?.gates.l5_capped ? (
+            <span>gate: <b>L5 capped — no multiplier signal</b></span>
+          ) : null}
+          {(main?.gates.multiplier_signal ?? 0) > 0 ? (
+            <span>multiplier signal <b>×{main!.gates.multiplier_signal}</b> — AI Leaders recognition</span>
+          ) : null}
+        </div>
+      </div>
+
+      {/* dimensions + the separate HARNESS index */}
+      <div className="card spectrum">
         {(['usage', 'efficiency', 'outcomes'] as const).map((d) => {
           const v = main?.dimensions?.[d] ?? null;
           return (
-            <div className="v3-dimrow" key={d}>
-              <span style={{ width: 82, color: 'var(--mut)', textTransform: 'capitalize' }}>{d}</span>
-              <div className="v3-dimbar"><span style={{ width: `${Math.max(2, v ?? 0)}%`, background: DIM_HUES[d] }} /></div>
-              <span className="v3-score" style={{ width: 44, textAlign: 'right' }}>{v === null ? '—' : v.toFixed(1)}</span>
+            <div className="subrow" key={d}>
+              <span className="lab">
+                <i style={{ background: DIM_HUES[d] }} />
+                {DIM_LABELS[d]}
+              </span>
+              <span className="track">
+                <i style={{ width: `${Math.max(2, v ?? 0)}%`, background: DIM_HUES[d] }} />
+              </span>
+              <span className="subval"><b>{v === null ? '—' : v.toFixed(1)}</b></span>
             </div>
           );
         })}
-      </div>
-      <div className="v3-panel" style={{ marginBottom: 0 }}>
-        <h2>HARNESS index <span className="hint">KPIs 12–15 · separate · no bands · never mixes into main</span></h2>
-        <div className="v3-hero-score" style={{ color: 'var(--harness)' }}>
-          {harness?.score === null || !harness ? '—' : harness.score.toFixed(1)}
+        <div className="subrow" style={{ borderTop: '1px solid var(--line)', paddingTop: 12, marginTop: 4 }}>
+          <span className="lab">
+            <i style={{ background: 'var(--prof)' }} />
+            Harness
+            <small>separate index · no bands</small>
+          </span>
+          <span className="track">
+            <i style={{ width: `${Math.max(2, harness?.score ?? 0)}%`, background: 'var(--prof)' }} />
+          </span>
+          <span className="subval">
+            <b>{harness?.score === null || !harness ? '—' : harness.score.toFixed(1)}</b>
+          </span>
         </div>
-        <div style={{ margin: '10px 0 6px' }}>
-          {harness ? <ConfidenceChip confidence={harness.confidence} suppressed={harness.score === null} /> : null}
-          {harness?.score === null ? <span className="v3-chip">insufficient signal — published honestly, never a fake 0</span> : null}
-        </div>
-        <p className="v3-mut v3-small" style={{ lineHeight: 1.55 }}>
-          Are the compounding practices installed? Skills authored · verification harness ·
-          review loop · context continuity. The 🔗 linkage engine ties gaps here to the
-          main-index damage they cause — see insights below.
+        <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.55 }}>
+          The HARNESS index (skills · verification · review loop · continuity) never mixes into the
+          main number — the 🔗 linkage engine ties gaps here to the main-index damage they cause.
+          {harness?.score === null ? ' Currently suppressed: insufficient signal (honest null, never a fake 0).' : ''}
         </p>
       </div>
     </div>
   );
 }
 
-export function KpiGrid({ kpis, title }: { kpis: KpiDailyRow[]; title: string }) {
+export function KpiGrid({ kpis, title, sub }: { kpis: KpiDailyRow[]; title: string; sub?: string }) {
   return (
-    <div className="v3-panel">
-      <h2>{title}</h2>
-      <div className="v3-kpigrid">
+    <div className="card">
+      <div className="cardhead">
+        <h3>{title}</h3>
+        {sub ? <span className="sub">{sub}</span> : null}
+      </div>
+      <div className="row r3" style={{ marginBottom: 0 }}>
         {kpis.map((k) => (
-          <div className="v3-kpicard" key={k.kpi_id}>
-            <div className="num">
-              KPI · {k.kpi_id.replaceAll('_', ' ')}
-              {k.index_kind === 'diagnostic' ? <span className="v3-chip" style={{ marginLeft: 6 }}>diagnostic</span> : null}
-              {k.tier ? <span className="v3-chip tier" style={{ marginLeft: 6 }}>{k.tier}</span> : null}
+          <div className="card tok" key={k.kpi_id} style={{ background: 'var(--panel2)' }}>
+            <div className="cardhead" style={{ marginBottom: 8 }}>
+              <h3 style={{ fontSize: 13 }}>{k.kpi_id.replaceAll('_', ' ')}</h3>
+              <span className="chiplist">
+                {k.index_kind === 'diagnostic' ? <span className="chip">diagnostic</span> : null}
+                {k.tier ? <span className="chip" style={{ color: 'var(--eff)' }}>{k.tier}</span> : null}
+              </span>
             </div>
-            <div className="val">{k.score === null ? '—' : k.score.toFixed(0)}</div>
-            <div className="raw">
-              raw: {k.raw_value === null ? 'no signal' : k.raw_value}
-              {' · '}n={k.signal_count}
+            <div className="bignum" style={{ fontSize: 34, margin: '2px 0 4px' }}>
+              {k.score === null ? '—' : Math.round(k.score)}
             </div>
+            <span className="unit">
+              raw {k.raw_value === null ? 'no signal' : k.raw_value} · n={k.signal_count}
+            </span>
           </div>
         ))}
       </div>
@@ -72,41 +113,63 @@ export function KpiGrid({ kpis, title }: { kpis: KpiDailyRow[]; title: string })
   );
 }
 
-export function InsightList({ insights, title, hint }: { insights: InsightRow[]; title: string; hint?: string }) {
+export function InsightList({ insights, title, sub }: { insights: InsightRow[]; title: string; sub?: string }) {
   return (
-    <div className="v3-panel">
-      <h2>{title}{hint ? <span className="hint">{hint}</span> : null}</h2>
-      {insights.length === 0 ? <div className="v3-empty">No confirmed insights — nothing below target with a surviving hypothesis.</div> : null}
-      {insights.map((i) => (
-        <div className={`v3-insight ch-${i.channel}`} key={i.id}>
-          <div className="t">
-            {i.title}
-            <span className="v3-chip" style={{ marginLeft: 8 }}>{i.kpi_id === 'linkage' ? '🔗 linkage' : i.kpi_id.replaceAll('_', ' ')} · {i.hypothesis}</span>
-            <span className="v3-chip">{CHANNEL_LABEL[i.channel] ?? i.channel}</span>
-          </div>
-          <div className="b">{i.body}</div>
+    <div className="card">
+      <div className="cardhead">
+        <h3>{title}</h3>
+        {sub ? <span className="sub">{sub}</span> : null}
+      </div>
+      {insights.length === 0 ? (
+        <EmptyState compact title="No confirmed insights" hint="nothing below target with a surviving hypothesis" />
+      ) : (
+        <div className="ins">
+          {insights.map((i) => (
+            <div className="insitem" key={i.id}>
+              <span className="n">{i.hypothesis}</span>
+              <span className="tx">
+                <b>{i.title}</b>
+                <small>{i.body}</small>
+              </span>
+              <span className={`tag2 ${CHANNEL_TAG2[i.channel] ?? 'usage'}`}>
+                {i.kpi_id === 'linkage' ? '🔗 ' : ''}{CHANNEL_LABEL[i.channel] ?? i.channel}
+              </span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }
 
 export function RecList({ recs, title }: { recs: RecommendationRow[]; title: string }) {
   return (
-    <div className="v3-panel">
-      <h2>{title}<span className="hint">impact = (100 − score) × index weight — auditable arithmetic</span></h2>
-      {recs.length === 0 ? <div className="v3-empty">No open recommendations.</div> : null}
-      {recs.map((r) => (
-        <div className={`v3-insight ch-${r.channel}`} key={r.id}>
-          <div className="t">
-            #{r.rank} · {r.title}
-            <span className="v3-chip" style={{ marginLeft: 8 }}>impact {r.impact.toFixed(1)}</span>
-            <span className="v3-chip">{CHANNEL_LABEL[r.channel] ?? r.channel}</span>
-            <span className="v3-chip">owner: {r.owner}</span>
-          </div>
-          <div className="b">{r.rationale} <span className="v3-mut">Targets: {r.targets.join(', ')}.</span></div>
+    <div className="card">
+      <div className="cardhead">
+        <h3>{title}</h3>
+        <span className="sub">impact = (100 − score) × index weight</span>
+      </div>
+      {recs.length === 0 ? (
+        <EmptyState compact title="No open recommendations" hint="every targeted KPI is at or near target" />
+      ) : (
+        <div className="prlist">
+          {recs.map((r) => (
+            <div className="pritem" key={r.id}>
+              <span className={`prtag ${r.impact >= 40 ? 'bad' : r.impact >= 20 ? 'warn' : 'ok'}`}>
+                #{r.rank} · {r.impact.toFixed(1)}
+              </span>
+              <span className="prbody">
+                <b>{r.title}</b>
+                <small>{r.rationale}</small>
+                <span className="sug">
+                  owner: {r.owner} · {CHANNEL_LABEL[r.channel] ?? r.channel} · targets {r.targets.join(', ')}
+                </span>
+              </span>
+              <span className="szbadge">{r.channel}</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

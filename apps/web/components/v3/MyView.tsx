@@ -1,6 +1,6 @@
 'use client';
 
-// My View — three sub-tabs:
+// My View — three sub-tabs in the app's own segmented-control treatment (.seg):
 //   1 Index         — score + both indexes + insights. NO actions here.
 //   2 Live coaching — SIMULATED replay of seeded v3.coaching_events on a timer.
 //   3 Growth        — courses + improvement areas + real v3.user_context writes.
@@ -31,17 +31,27 @@ const TABS = ['Index', 'Live coaching', 'Growth'] as const;
 export function MyView(p: Props) {
   const [tab, setTab] = useState<(typeof TABS)[number]>('Index');
   const router = useRouter();
-  const nudgeRecs = useMemo(
+  const actionRecs = useMemo(
     () => p.recommendations.filter((r) => r.channel === 'nudge' || r.channel === 'rec'),
     [p.recommendations],
   );
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
-        <h1 className="v3-h1">My View — {p.dev.name}</h1>
+      <div className="daterow" style={{ marginBottom: 4 }}>
+        <nav className="seg" role="tablist" aria-label="My View tabs">
+          {TABS.map((t) => (
+            <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
+              {t}
+            </button>
+          ))}
+        </nav>
+        <span className="pill">
+          demo switcher: <b>@{p.dev.handle}</b> — in production you only ever see yourself
+        </span>
         <select
-          className="v3-select"
+          className="linkbtn"
+          style={{ background: 'var(--panel)' }}
           value={p.dev.handle}
           onChange={(e) => router.push(`/v3/me?dev=${e.target.value}`)}
           aria-label="Switch developer (demo)"
@@ -51,27 +61,14 @@ export function MyView(p: Props) {
           ))}
         </select>
       </div>
-      <p className="v3-sub">
-        archetype: {p.dev.archetype.replaceAll('_', ' ')} · config v{p.pin.version}, as-of {p.pin.date ?? '—'} ·
-        the switcher exists because this is a demo — in production you only ever see yourself.
-      </p>
-
-      <div className="v3-tabs" role="tablist">
-        {TABS.map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
-            {t}
-          </button>
-        ))}
-      </div>
 
       {tab === 'Index' ? (
         <>
           <IndexHero main={p.main} harness={p.harness} />
-          <div style={{ height: 18 }} />
           <InsightList
             insights={p.insights}
             title="Your insights"
-            hint="read-only here — actions live in Live coaching (in-flow) and Growth (self-driven)"
+            sub="read-only — actions live in Live coaching (in-flow) and Growth (self-driven)"
           />
         </>
       ) : null}
@@ -79,7 +76,7 @@ export function MyView(p: Props) {
       {tab === 'Live coaching' ? (
         <>
           <CoachingReplay events={p.coaching} />
-          <RecList recs={nudgeRecs} title="Open recommendations tied to your coaching" />
+          <RecList recs={actionRecs} title="Open recommendations tied to your coaching" />
         </>
       ) : null}
 

@@ -1,30 +1,27 @@
+// app/v3/layout.tsx
+//
+// v3 preview section. Renders inside the standard AppShell (root layout) using the
+// app's existing design system — no bespoke styling. Adds only the mandatory
+// DEMO DATA banner (the approved `.note` treatment) above every v3 page.
+
 import type { ReactNode } from 'react';
-import { activePin } from '@/lib/v3/read';
-import { V3Nav } from '@/components/v3/Nav';
-import './v3.css';
 
 export const dynamic = 'force-dynamic';
 
-export default async function V3Layout({ children }: { children: ReactNode }) {
-  let versionLabel = 'v3 · not computed';
-  try {
-    const pin = await activePin();
-    versionLabel = `config v${pin.version}${pin.date ? ` · as-of ${pin.date}` : ' · not computed'}`;
-  } catch {
-    versionLabel = 'v3 · database unavailable';
-  }
+export default function V3Layout({ children }: { children: ReactNode }) {
   return (
-    <div className="v3-root">
-      <div className="v3-demo-banner">
-        ◤ DEMO DATA — v3.0 preview on a deterministic synthetic dataset (schema `v3`, 10 archetypal
-        developers). No real employee data. The v1 app and public schema are untouched.
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{ padding: '16px 24px 0' }}>
+        <div className="note" style={{ marginBottom: 0 }}>
+          <h4>◤ DEMO DATA — v3.0 model preview</h4>
+          <p>
+            Everything below runs on a <b>deterministic synthetic dataset</b> (Postgres schema{' '}
+            <b>v3</b>, 10 archetypal developers). No real employee data; the v1 app and public
+            schema are untouched. Rebuild the identical world with <b>npm run v3:reset</b>.
+          </p>
+        </div>
       </div>
-      <header className="v3-header">
-        <div className="v3-logo">Prism <em>v3 preview</em></div>
-        <V3Nav />
-        <span className="v3-chip-version">{versionLabel}</span>
-      </header>
-      <main className="v3-main">{children}</main>
+      {children}
     </div>
   );
 }

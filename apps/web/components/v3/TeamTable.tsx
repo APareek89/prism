@@ -1,9 +1,13 @@
 'use client';
 
+// Team table — the v1 roster-table treatment (.mem/.av avatars, .idxmini scores,
+// .chip list, standard table styles from globals.css). Sortable headers.
+
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Band } from '@prism/contract';
-import { BandChip, ConfidenceChip, ScoreCell } from './chips';
+import { ScoreCell, V3BandChip, V3ConfidenceChip } from './chips';
+import { DIMENSION_HUES } from '@/app/tokens';
 
 export interface TeamTableRow {
   id: string;
@@ -37,6 +41,12 @@ const COLS: Array<{ key: SortKey | null; label: string }> = [
   { key: 'insightCount', label: 'Insights · Recs' },
 ];
 
+const DIM_HUES: Record<string, string> = {
+  usage: DIMENSION_HUES.usage,
+  efficiency: DIMENSION_HUES.efficiency,
+  outcomes: DIMENSION_HUES.effectiveness,
+};
+
 export function TeamTable({ rows }: { rows: TeamTableRow[] }) {
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: 'mainScore', dir: -1 });
 
@@ -57,11 +67,16 @@ export function TeamTable({ rows }: { rows: TeamTableRow[] }) {
     setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: -1 }));
 
   return (
-    <table className="v3-table">
+    <table>
       <thead>
         <tr>
           {COLS.map((c) => (
-            <th key={c.label} className={c.key ? '' : 'nosort'} onClick={c.key ? () => toggle(c.key!) : undefined}>
+            <th
+              key={c.label}
+              onClick={c.key ? () => toggle(c.key!) : undefined}
+              style={c.key ? { cursor: 'pointer', userSelect: 'none' } : undefined}
+              aria-sort={c.key === sort.key ? (sort.dir === -1 ? 'descending' : 'ascending') : undefined}
+            >
               {c.label}
               {c.key === sort.key ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}
             </th>
@@ -72,28 +87,46 @@ export function TeamTable({ rows }: { rows: TeamTableRow[] }) {
         {sorted.map((r) => (
           <tr key={r.id}>
             <td>
-              <Link href={`/v3/dev/${r.handle}`}>{r.name}</Link>
-              <div className="v3-mut v3-small">@{r.handle} · {r.archetype.replaceAll('_', ' ')}</div>
+              <Link href={`/v3/dev/${r.handle}`} className="mem" style={{ color: 'inherit', textDecoration: 'none' }}>
+                <span className="av">{initials(r.name)}</span>
+                <span>
+                  <b>{r.name}</b>
+                  <small>@{r.handle} · {r.archetype.replaceAll('_', ' ')}</small>
+                </span>
+              </Link>
             </td>
             <td>
-              <ScoreCell score={r.mainScore} />{' '}
-              <ConfidenceChip confidence={r.mainConfidence} suppressed={r.mainScore === null} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <ScoreCell score={r.mainScore} />
+                <V3ConfidenceChip confidence={r.mainConfidence} suppressed={r.mainScore === null} />
+              </span>
             </td>
             <td>
-              <BandChip band={r.band} />
-              {r.l0Forced ? <div className="v3-mut v3-small">gate: AI share &lt; 15%</div> : null}
-              {r.l5Capped ? <div className="v3-mut v3-small">capped: no multiplier</div> : null}
-              {r.multiplier > 0 ? <div className="v3-mut v3-small">multiplier ×{r.multiplier}</div> : null}
+              <V3BandChip band={r.band} />
+              {r.l0Forced ? <small className="muted2" style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10.5, marginTop: 3 }}>gate: AI share &lt;15%</small> : null}
+              {r.l5Capped ? <small className="muted2" style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10.5, marginTop: 3 }}>capped: no multiplier</small> : null}
+              {r.multiplier > 0 ? <small className="muted2" style={{ display: 'block', fontFamily: 'var(--mono)', fontSize: 10.5, marginTop: 3 }}>multiplier ×{r.multiplier}</small> : null}
             </td>
             <td>
-              <DimBars dims={r.dimensions} />
+              <span style={{ display: 'flex', gap: 5 }}>
+                {(['usage', 'efficiency', 'outcomes'] as const).map((d) => {
+                  const v = r.dimensions[d];
+                  return (
+                    <span key={d} className="track" title={`${d}: ${v == null ? '—' : v.toFixed(1)}`} style={{ width: 34 }}>
+                      {v != null ? <i style={{ width: `${Math.max(3, v)}%`, background: DIM_HUES[d] }} /> : null}
+                    </span>
+                  );
+                })}
+              </span>
             </td>
             <td>
-              <ScoreCell score={r.harnessScore} />{' '}
-              <ConfidenceChip confidence={r.harnessConfidence} suppressed={r.harnessScore === null} />
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <ScoreCell score={r.harnessScore} />
+                <V3ConfidenceChip confidence={r.harnessConfidence} suppressed={r.harnessScore === null} />
+              </span>
             </td>
-            <td className="v3-score">{r.aiSharePct === null ? '—' : `${r.aiSharePct.toFixed(0)}%`}</td>
-            <td className="v3-mut">{r.insightCount} · {r.recCount}</td>
+            <td className="trendcell">{r.aiSharePct === null ? '—' : `${r.aiSharePct.toFixed(0)}%`}</td>
+            <td className="muted mono" style={{ fontSize: 12 }}>{r.insightCount} · {r.recCount}</td>
           </tr>
         ))}
       </tbody>
@@ -101,22 +134,5 @@ export function TeamTable({ rows }: { rows: TeamTableRow[] }) {
   );
 }
 
-const DIM_HUES = { usage: '#5b8def', efficiency: '#2dd4bf', outcomes: '#f5a524' } as const;
-
-function DimBars({ dims }: { dims: TeamTableRow['dimensions'] }) {
-  return (
-    <div style={{ display: 'flex', gap: 5 }}>
-      {(['usage', 'efficiency', 'outcomes'] as const).map((d) => {
-        const v = dims[d];
-        return (
-          <div key={d} title={`${d}: ${v === null || v === undefined ? '—' : v.toFixed(1)}`}
-            style={{ width: 34, height: 7, borderRadius: 4, background: '#1a2136', overflow: 'hidden' }}>
-            {v !== null && v !== undefined ? (
-              <div style={{ width: `${Math.max(3, v)}%`, height: '100%', background: DIM_HUES[d] }} />
-            ) : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+const initials = (name: string) =>
+  name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();

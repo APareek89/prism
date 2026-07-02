@@ -1,9 +1,9 @@
 'use client';
 
-// Growth tab: (A) embedded-course grid with generated CSS/SVG thumbnails,
-// (B) improvement areas derived from confirmed-hypothesis insights,
-// (C) "Mark complete / I adopted this" → REAL insert into v3.user_context
-//     (optimistic UI) + the "what's driving improvement" strip fed from it.
+// Growth tab — the app's own treatments end to end: the v1 `.course` card for the
+// course grid (SVG sparkline icon, no external images), `.wellitem` for
+// improvement areas, `.stchip` chips for the "what's driving improvement" strip.
+// Buttons INSERT real rows into v3.user_context (optimistic UI + rollback).
 
 import { useMemo, useState } from 'react';
 import type { UserContextRow } from '@prism/contract';
@@ -33,6 +33,18 @@ interface Props {
   areas: Area[];
   userContext: UserContextRow[];
 }
+
+// KPI family → the .wellitem category treatments (globals.css).
+const AREA_CAT: Record<string, { cls: string; glyph: string }> = {
+  ai_share: { cls: 'prompt', glyph: 'U' },
+  cadence: { cls: 'prompt', glyph: 'U' },
+  iterations: { cls: 'waste', glyph: 'E' },
+  tokens: { cls: 'waste', glyph: 'E' },
+  revert: { cls: 'qual', glyph: 'O' },
+  rework: { cls: 'qual', glyph: 'O' },
+  reliability: { cls: 'qual', glyph: 'O' },
+  linkage: { cls: 'skill', glyph: '🔗' },
+};
 
 export function GrowthTab({ developerId, courses, areas, userContext }: Props) {
   // Optimistic completion state seeded from the real table.
@@ -67,10 +79,10 @@ export function GrowthTab({ developerId, courses, areas, userContext }: Props) {
       const ref = refParts.join(':');
       if (kind === 'course_completed') {
         const c = courses.find((x) => x.id === ref);
-        if (c) labels.push(`✓ completed: ${c.title}`);
+        if (c) labels.push(`completed: ${c.title}`);
       } else {
         const a = areas.find((x) => x.key === ref);
-        if (a) labels.push(`✓ adopted: ${a.title}`);
+        if (a) labels.push(`adopted: ${a.title}`);
       }
     }
     return labels;
@@ -79,69 +91,105 @@ export function GrowthTab({ developerId, courses, areas, userContext }: Props) {
   return (
     <>
       {/* (C) the management-facing evidence strip — fed from v3.user_context */}
-      <div className="v3-panel">
-        <h2>What&apos;s driving your improvement <span className="hint">real rows in v3.user_context — re-verified from data in 14 days, never self-reported alone</span></h2>
-        {drivingItems.length === 0
-          ? <div className="v3-empty">Nothing recorded yet — complete a course or adopt an improvement below and it lands here (and in the management view).</div>
-          : <div className="v3-driving">{drivingItems.map((l) => <span className="item" key={l}>{l}</span>)}</div>}
+      <div className="card">
+        <div className="cardhead">
+          <h3>What&apos;s driving your improvement</h3>
+          <span className="sub">real rows in v3.user_context · re-verified from data in 14 days</span>
+        </div>
+        {drivingItems.length === 0 ? (
+          <p className="muted" style={{ fontSize: 12.5 }}>
+            Nothing recorded yet — complete a course or adopt an improvement below and it lands
+            here (and in the management view).
+          </p>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {drivingItems.map((l) => (
+              <span className="stchip st-adopted" key={l}>✓ {l}</span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* (B) improvement areas from confirmed-hypothesis insights */}
-      <div className="v3-panel">
-        <h2>Improvement areas for self-learning <span className="hint">derived from YOUR confirmed hypotheses — not generic advice</span></h2>
-        {areas.length === 0 ? <div className="v3-empty">No actionable areas — every hypothesis test came back clean.</div> : null}
-        {areas.map((a) => {
-          const key = `adopted:${a.key}`;
-          const isDone = done.has(key);
-          return (
-            <div className="v3-insight ch-rec" key={a.key}>
-              <div className="t">{a.title}<span className="v3-chip" style={{ marginLeft: 8 }}>{a.kpiId.replaceAll('_', ' ')}</span></div>
-              <div className="b">{a.body}</div>
-              <div style={{ marginTop: 9 }}>
-                <button
-                  className={`v3-btn ${isDone ? 'done' : ''}`}
-                  disabled={pending.has(key)}
-                  onClick={() => record('adopted', a.key, a.title)}
-                >
-                  {isDone ? '✓ Adopted — tracked' : 'I adopted this'}
-                </button>
-              </div>
-            </div>
-          );
-        })}
+      <div className="card">
+        <div className="cardhead">
+          <h3>Improvement areas for self-learning</h3>
+          <span className="sub">derived from YOUR confirmed hypotheses — not generic advice</span>
+        </div>
+        {areas.length === 0 ? (
+          <p className="muted" style={{ fontSize: 12.5 }}>No actionable areas — every hypothesis test came back clean.</p>
+        ) : (
+          <div className="well">
+            {areas.map((a) => {
+              const key = `adopted:${a.key}`;
+              const isDone = done.has(key);
+              const cat = AREA_CAT[a.kpiId] ?? { cls: 'skill', glyph: 'H' };
+              return (
+                <div className="wellitem" key={a.key}>
+                  <span className={`cat ${cat.cls}`}>{cat.glyph}</span>
+                  <span className="tx">
+                    <b>{a.title}</b>
+                    <span className="cause">
+                      {a.body} <em>{a.kpiId.replaceAll('_', ' ')}</em>
+                    </span>
+                    <button
+                      type="button"
+                      className="linkbtn"
+                      style={{ marginTop: 8, ...(isDone ? { color: 'var(--good)', borderColor: 'var(--good)' } : {}) }}
+                      disabled={pending.has(key)}
+                      onClick={() => record('adopted', a.key, a.title)}
+                    >
+                      {isDone ? '✓ adopted — tracked' : 'I adopted this'}
+                    </button>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* (A) embedded course grid — generated CSS thumbnails, no external images */}
-      <div className="v3-panel">
-        <h2>Courses <span className="hint">recommended first, matched to your weak KPIs · thumbnails generated, no external images</span></h2>
-        <div className="v3-courses">
+      {/* (A) embedded course grid — the v1 .course card, generated SVG icons only */}
+      <div className="card">
+        <div className="cardhead">
+          <h3>Courses</h3>
+          <span className="sub">recommended first, matched to your weak KPIs · generated thumbnails, no external images</span>
+        </div>
+        <div className="row r2" style={{ marginBottom: 0 }}>
           {courses.map((c) => {
             const key = `course_completed:${c.id}`;
             const isDone = done.has(key);
             return (
-              <div className="v3-course" key={c.id}>
-                <div className="thumb" style={{ background: `linear-gradient(135deg, hsl(${c.hue} 65% 38%), hsl(${(c.hue + 40) % 360} 70% 22%))` }}>
-                  <svg viewBox="0 0 100 40" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.5 }} aria-hidden>
+              <div className="course" key={c.id}>
+                <span className="ico" aria-hidden>
+                  <svg viewBox="0 0 24 24" width="22" height="22">
                     <polyline
-                      points={`0,${34 - (c.hue % 9)} 20,${26 + (c.hue % 7)} 40,${18 - (c.hue % 5) + 8} 60,${22 - (c.hue % 8)} 80,${12 + (c.hue % 6)} 100,8`}
-                      fill="none" stroke="white" strokeWidth="1.6"
+                      points={`2,${18 - (c.hue % 5)} 8,${12 + (c.hue % 6)} 14,${8 + (c.hue % 4)} 22,5`}
+                      fill="none"
+                      stroke={`hsl(${c.hue} 70% 65%)`}
+                      strokeWidth="2"
+                      strokeLinecap="round"
                     />
-                    <circle cx={80} cy={12 + (c.hue % 6)} r="2.4" fill="white" />
+                    <circle cx="22" cy="5" r="2" fill={`hsl(${c.hue} 70% 65%)`} />
                   </svg>
-                  <span className="badge">{c.minutes} min · {c.level}</span>
-                  {c.recommended ? <span className="badge" style={{ left: 'auto', right: 10, background: 'rgba(62,207,142,0.35)' }}>recommended</span> : null}
-                </div>
-                <div className="body">
-                  <div className="t">{c.title}</div>
-                  <div className="b">{c.blurb}</div>
-                  <button
-                    className={`v3-btn ${isDone ? 'done' : ''}`}
-                    disabled={pending.has(key)}
-                    onClick={() => record('course_completed', c.id, c.title)}
-                  >
-                    {isDone ? '✓ Completed' : 'Mark complete'}
-                  </button>
-                </div>
+                </span>
+                <span className="meta">
+                  <b>{c.title}</b>
+                  <p>{c.blurb}</p>
+                  <p className="mono" style={{ fontSize: 10.5, marginTop: 5 }}>
+                    {c.minutes} min · {c.level}
+                    {c.recommended ? <span style={{ color: 'var(--good)' }}> · recommended for you</span> : null}
+                  </p>
+                </span>
+                <button
+                  type="button"
+                  className="opencourse"
+                  style={{ background: 'none', cursor: 'pointer', ...(isDone ? { color: 'var(--good)', borderColor: 'var(--good)' } : {}) }}
+                  disabled={pending.has(key)}
+                  onClick={() => record('course_completed', c.id, c.title)}
+                >
+                  {isDone ? '✓ Completed' : 'Mark complete'}
+                </button>
               </div>
             );
           })}

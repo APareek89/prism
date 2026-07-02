@@ -1,7 +1,9 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+// v3 section nav — the app's segmented control (.seg from globals.css), used the
+// same way PeriodToggle uses it. Buttons (not links) because .seg styles buttons.
+
+import { usePathname, useRouter } from 'next/navigation';
 
 const TABS = [
   { href: '/v3', label: 'Team' },
@@ -10,15 +12,22 @@ const TABS = [
 ];
 
 export function V3Nav() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '/v3';
+  const router = useRouter();
   const isActive = (href: string) =>
     href === '/v3' ? pathname === '/v3' || pathname.startsWith('/v3/dev') : pathname.startsWith(href);
   return (
-    <nav className="v3-nav">
+    <nav className="seg" aria-label="v3 preview sections">
       {TABS.map((t) => (
-        <Link key={t.href} href={t.href} className={isActive(t.href) ? 'active' : ''}>
+        <button
+          key={t.href}
+          type="button"
+          className={isActive(t.href) ? 'on' : ''}
+          aria-current={isActive(t.href) ? 'page' : undefined}
+          onClick={() => router.push(t.href)}
+        >
           {t.label}
-        </Link>
+        </button>
       ))}
     </nav>
   );
