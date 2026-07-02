@@ -28,14 +28,24 @@ stale). Claude Code ingested **287 `~/.claude` sessions**; GitHub backfilled **8
 any PR yet (session `branch=HEAD`, no sha/trailer on the session side), so every AI-denominated KPI is
 0/null. Fixing the AI→PR link is the key next piece.
 
-**Session 2026-07-01 — 3 wiring fixes** (branch `fix/scoring-display-wiring`, PR open):
-1. **`signal_count` now persisted** (it was computed then dropped in `kpiRowsFor`/`toKpiDb`) → improvement
-   + "what's going well" insights now generate at employee scope (member-detail view). 2. **Read layer +
-   email now show the engine's stored band** (`bandLabelForStored`) — a gated `L0 · Dormant` instead of an
-   L1-bucketed `L2 · Productive`. 3. **pr_level titles** no longer falsely say "AI-assisted" for non-AI PRs.
-**Still open:** (a) **AI→PR link = 0** — root cause; needs a linking-key design decision (session side has
-no branch/sha/trailer to join on). (b) **Function-scope improvement panel empty** — the engine emits KPI
-rows only at employee scope, so function has no `kpi_daily` (persist function KPIs, or aggregate employee KPIs).
+**Session 2026-07-01 — 3 wiring fixes + AI→PR link (all merged to `main`):**
+- **PR #9** — (1) persist per-KPI `signal_count` (was computed then dropped in `kpiRowsFor`/`toKpiDb`) →
+  improvement + "what's going well" insights now generate; (2) read layer + email show the engine's **stored
+  band** (`bandLabelForStored`) not an L1 bucket; (3) `prTitle` gates "AI-assisted" on `aiLinked`.
+- **PR #10 — AI→PR link now FIRES.** Claude Code writes a first-party **`pr-link` event** ({sessionId,
+  prRepository, prNumber}) to the session log; used as an exact `pr_link`@0.99 join key. Migration **`0033`**
+  adds `cc_sessions.pr_refs` + extends the `pr_ai_link.method` CHECK. After re-run: `pr_ai_link` **0 → 50**,
+  self employee **band L0 → L1**, `ai_assisted_pr_share` **0 → 100**, Effectiveness gets a real AI denominator,
+  blame captured 724 AI lines.
+
+**Still open (follow-ups, no code yet):**
+1. **Over-linking** — the repo-scoped `coauthor`@0.60 fallback cartesian-links every same-repo session↔PR
+   (22 of 50 links; each of 10 PRs tied to all 5 sessions). Suppress it when `pr_link` already covers a PR +
+   de-dupe cwd-split sessions. Violates the no-false-links rule; inflates per-PR iteration attribution.
+2. **`ai_code_retention_30d` premature 0** — freshly-merged AI lines (<30d, not re-checked) score 0 instead
+   of pending/null, dragging Effectiveness 100→66.7 and L1 ~46.5→33.2.
+3. **Function-scope improvement panel empty** — engine emits `kpi_daily` only at employee scope, so function
+   has no rows for its improvement agent (persist function KPIs, or aggregate employee KPIs).
 
 ---
 
@@ -180,14 +190,13 @@ PR from that branch.** The session (cwd=repo, branch=feature-x) then links to th
   not_configured, no ingested data) awaiting the live connect.
 
 ## Testing status / next
-Awaiting the user's one manual step: **GitHub App install** (browser approval — only the repo owner can).
-Then: Scan Claude → Connect GitHub (install on APareek89/prism) → Run pipeline → the index scores the 6
-PRs. Known M4 follow-up: agent `ai_slop` verdict is inert until per-PR agentic/rework signals are surfaced
-onto `gh_prs` columns (M3 computes them for scoring at runtime; the agent's PrRecord reads gh_prs) —
-revert/re-prompt verdicts work today.
+End-to-end loop is verified working: connect → sessions → PR → **AI-linked** → scored → narrated, on real data.
+Next up are the three follow-ups above (over-linking, retention premature-0, function-scope KPIs). Agent
+`ai_slop` verdict stays inert until per-PR agentic/rework signals land on `gh_prs` columns; revert/re-prompt
+verdicts work today.
 
 ## Commits (main)
 `5c6d1e7` spec → `816f330` architecture → `1eb3bf8` M0 → `a72694d` db fixes → `a452bb3` M1 →
-`41e2050`/`5ac1eff`/`02cd431` M2 → `9d98a71` M3+M4 → `35da916` M5 docs. Then dogfood PRs #1–#6
-(reset script, testing/dogfooding docs, PR template, docs index, **#6 github install-flow fix**).
+`41e2050`/`5ac1eff`/`02cd431` M2 → `9d98a71` M3+M4 → `35da916` M5 docs. Then dogfood PRs #1–#10 (#1–#6 reset/docs/PR-template/install-flow · #7 handoff connectors · #8 CLAUDE.md ·
+**#9 scoring+display wiring** · **#10 AI→PR link + migration 0033**).
 Repo: `APareek89/prism` (private). Workflow going forward = PRs (see `docs/dogfooding.md`).
