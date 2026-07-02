@@ -237,7 +237,79 @@ The aligned defaults — change only via the open-decisions process:
 | Manager index | **Enablement-only** — never inherited team level, never per-IC coaching data |
 | Cross-pack ranking | **Never — anywhere in the UI** (default sort by headcount, no league tables) |
 
-## 9. Open decisions
+## 9. Bucket 2 — AI Run-Cost (2a) & Internal AI Work-Cost (2b)
+
+> Aligned 2026-07-02. Prism's whole idea = reduce the cost of AI / improve its ROI for a SaaS
+> company. The AI P&L has four buckets: **1 Build** (people using AI to build — covered by the
+> Phase-1 workforce indexes: better efficiency/effectiveness = output at lower cost) · **2a Run**
+> (AI inside the product serving customers — COGS, scales with customers) · **2b Work** (AI in
+> internal workflows — OpEx, scales with employees) · **3 Value** (revenue attribution —
+> deliberately deferred; hooks planted via gateway tags + flag rollouts, and Prism never
+> fabricates a "revenue from AI" number).
+>
+> **Dollars rule:** bucket 1 is tokens-only (dollars would be derived); buckets 2a/2b show
+> dollars because they are **billed** — invoices and seat contracts are fetched facts. The rule
+> was never "no dollars"; it is "no invented dollars."
+>
+> **Interactive KPI spec (demo numbers):** `prism-model-lab/public/run-cost.html` — served on
+> the lab at `localhost:4600/run-cost.html` and the shared copy at
+> https://prism-model-lab-anand-pareeks-projects.vercel.app/run-cost.html
+
+### 2a · Run cost — the owner's two keys, formalized
+
+① **Visibility** — which API/model is used by which feature, at what billed cost.
+② **Segmentation** — the same call ledger split three ways: **environment** (building the
+feature vs serving production), **serving** (API calls vs actual feature uses), and **who it
+serves** (paying customer · top-of-funnel free · nobody). Free spend with a conversion path is
+**acquisition spend, not waste** — only unmonetized spend (dormant features, abuse, leaks) is
+definitionally waste.
+
+**Prerequisite (the one mandate that unlocks the bucket):** route product AI calls through a
+gateway that stamps `feature · model · env · customer-tier` on every call. Without tags this
+bucket collapses to one blurry total — the same hygiene lesson as release-SHAs for KPI 9.
+
+| KPI | Calculation | Why it matters |
+|---|---|---|
+| **Attribution coverage** (GATE) | tagged spend ÷ total billed spend | every other KPI is only as good as this; target ≥95% |
+| Cost by feature × model | billed ledger grouped by tags | the visibility ask, answered |
+| Build-vs-serve split | dev/staging/test spend ÷ total | building features is R&D, not COGS; margin math uses serve-spend only |
+| Dev-on-prod-keys leak | dev-fingerprinted spend on prod keys | pure waste + pollutes unit economics |
+| Cost per 1k feature uses | prod cost ÷ uses (product analytics) | the unit-economics headline per feature |
+| **Calls-per-use ratio** | API calls ÷ feature uses | >~1.3 = retries/fan-out burning money invisibly |
+| Paid-serving share | prod spend on paying customers ÷ prod spend | the spend gross margin must carry |
+| Acquisition share + CAC lens | free-with-conversion-path spend · free AI cost ÷ conversions | decide gates with data (vs blended CAC), not fear |
+| Unmonetized waste share | dormant + abuse + leak ÷ prod spend | the only true recovery target |
+| Model-mix efficiency | calls on cheapest adequate model ÷ calls | premium models on trivial routes |
+| Cache hit rate · prompt-size creep | standard | silent compounding costs |
+| Cost per successful outcome | prod cost ÷ completed tasks | failures make calls cheap and outcomes expensive |
+
+Diagnosis is H0-first as everywhere ("spend spiked": H0 traffic grew → H1 retry storm → H2
+prompt bloat → H3 model drift → H4 free-tier abuse), every insight terminates in an action
+(routing rule, cache, prompt diet, tier gate, per-env keys), and **savings are verified against
+the next bill** via the same adoption loop — the differentiator over show-only
+FinOps/observability dashboards.
+
+### 2b · Work cost — spend vs process-efficiency improvement
+
+The joint metric that keeps it honest: **cost per process unit** (per CV screened, per ticket
+resolved, per deck shipped) and its trend vs the pre-AI baseline. Throughput comes from system
+counts (ATS, helpdesk, PM tools) — observable; **Prism never claims "hours saved."**
+
+| KPI | Calculation | Why it matters |
+|---|---|---|
+| Dormant seat rate | 0-activity-in-30d seats ÷ paid seats (SSO + billing) | usually the biggest recoverable line item |
+| Cost per active user, per tool | tool cost ÷ 30d-active users | real unit price, not sticker price |
+| Tool redundancy | tools per job-to-be-done | consolidation candidates |
+| **Unit process cost** (JOINT) | (tool + internal API cost) ÷ process units | "cost of AI vs efficiency" in one number per workflow |
+| Throughput trend | units/person/day, **within-team before/after** | the linkage-engine method → causal-ish, not vibes |
+| Adoption × outcome quadrant | usage depth vs throughput delta | verdicts: keep · train · reassess · cancel |
+| Spend vs efficiency delta, per function | function AI OpEx vs its unit-cost trend | where internal AI money demonstrably works |
+
+**The join only Prism can make:** a function with seats and tools but low usage and no harness
+has a **training problem, not a procurement problem** — that routing exists because Prism holds
+both the spend side and the workforce/harness indexes.
+
+## 10. Open decisions
 
 | # | Decision | Status |
 |---|---|---|
@@ -245,9 +317,14 @@ The aligned defaults — change only via the open-decisions process:
 | 2 | **Org-rollup weighting override option** — whether an org may override headcount weighting (e.g. exclude a function, cap a weight); default stays people-weighted | open |
 | 3 | **Manager-index anchors** — floors/targets for the five KPI families in §7, plus the minimum-reports N | open |
 | 4 | **SCIM timing** — when the SSO/SCIM (Okta/AD) roster sync replaces CSV as primary (v2 scope) | open |
+| 5 | **Gateway choice for 2a tagging** (LiteLLM/Portkey/Helicone-class vs own thin proxy) + the tag schema | open |
+| 6 | **2a anchors** (attribution ≥95%, calls-per-use ≤1.3, …) — calibrate with the first real bill | open |
+| 7 | **2b process-unit definitions per function** (what counts as a unit, from which system of record) | open |
 
 ---
 
 *Changelog: v1 · 2026-07-02 — initial Phase-2 alignment with the product owner (function packs ·
 org rollup · management dashboard · scope chain · onboarding · Manager Enablement Index).
+v1.1 · 2026-07-02 — Bucket-2 section added (2a run-cost + 2b work-cost KPI spec, billed-dollars
+rule, gateway-tagging prerequisite, demo page `run-cost.html`).
 Nothing implemented; Phase-1 = the v3.0 engineering model in `scoring-model.md`.*
