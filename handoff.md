@@ -45,8 +45,57 @@ diagnostic trees (H0 "is the number real?" first), control-group gap, telemetry 
 line, and the open-decisions backlog. Read it before changing any KPI/weight/anchor.
 **v1.1 (PR #12):** multiplier signal → OUT of the weighted index (now "AI Leaders" recognition +
 L5 gate; code change queued); **agent-harness KPI family proposed** — 13 verification-harness ·
-14 review-loop · 15 context-continuity (Goodhart guardrails documented). Model feedback loop runs
-in the **model lab** microsite at `~/Documents/prism-model-lab` (localhost:4600, feedback.json).
+14 review-loop · 15 context-continuity (Goodhart guardrails documented).
+
+## MODEL SPEC v3.0 (2026-07-02) — ⚠ SPEC IS AHEAD OF THE APP
+The model was iterated through 3 feedback rounds in the **model lab** (`~/Documents/prism-model-lab`,
+run `node server.mjs` → localhost:4600; per-row 💬 feedback in `feedback.json`; shareable read-only
+copy: https://prism-model-lab-anand-pareeks-projects.vercel.app — feedback buttons only work on
+localhost). `docs/scoring-model.md` mirrors the lab (v3.0 sync PR by background agent). Lab source
+of truth: `prism-model-lab/public/content.js`.
+
+**v3.0 decisions (owner-approved, NOT yet in code):**
+1. **Two indexes.** MAIN index = Usage 15% · Efficiency 35% · Outcomes 50% (Core-6: KPIs 1 ai-share,
+   3 cadence, 4 iterations, 6 tokens, 7 revert, 10 rework). **HARNESS index** = KPIs 12 skills-authored,
+   13 verification, 14 review-loop, 15 continuity — equal weights, scored SEPARATELY (proficiency is a
+   driver; inside the main index it double-counts).
+2. **🔗 Linkage engine** (ex-KPI 11): never scored; within-person tests of harness-gap→outcome links
+   (verification→reverts/rework · review-loop→reverts+review burden · continuity→iterations/tokens ·
+   skills→repeat sessions). This is how "no harness caused your reverts" gets proven, not asserted.
+3. **Removed/demoted:** KPI 2 agentic-depth → diagnostic signal · KPI 5 edit-survival → diagnostic
+   signal · KPI 8 retention REMOVED (may only return with a human-baseline control) · **Cost/USD
+   dropped everywhere — tokens only** · multiplier = AI Leaders recognition + L5 gate only.
+4. **KPI 7:** ALL post-merge reverts count (self-caught included); who-caught routes the ACTION
+   (self→verification coaching, other→review gate). Detection prefers GitHub-native revert linkage.
+5. **KPI 9 rebuilt = "Change reliability"** on an evidence ladder: T1 rollback/hotfix ≤48h
+   (GitHub deploy events — DORA, scores, no Sentry needed) · T2 new-error regression (Sentry,
+   hygiene-gated ≥90%) · T3 user-impact corroboration · T4 value signal (flags+usage, parked).
+   Tier badge on every number; promote to core after one clean T1 month. Sentry = optional enrichment.
+6. **Cadence rule:** scoring = daily batch; coaching = realtime in-flow (Addendum B plugin, rules
+   C1–C6, local eval ≤500ms, prompt text never leaves the machine).
+7. **Backend build order** (Data & Integration tab): P1 Core-6 main index → P2 Harness index (parser
+   extensions only — data already on disk) → P3 KPI 9 T1 (GitHub Deployments) → P4 telemetry/org
+   rollout + coaching plugin → P5 optional enrichment (Sentry/PagerDuty/extra perms).
+
+**APP vs SPEC gap (the next big implementation project):** the app still runs the v1 model — 13 KPIs,
+weights 10/25/40/25, retention/CFR/acceptance in the engine, multiplier scored, single index. Nothing
+in `lib/scoring` has been changed for v3.0. Do NOT partially implement; when the owner says
+"implement v3.0", follow scoring-model.md's open-decisions table and ship via dogfood PRs.
+
+## Next session — paste-ready prompt (for the owner)
+```
+Continue the Prism project at /Users/anandpareek/Documents/prism.
+FIRST read, in order: (1) handoff.md — status, v3.0 model decisions, app-vs-spec gap;
+(2) docs/scoring-model.md — the v3.0 model spec (the TARGET); (3) CLAUDE.md — hard rules
+(no dummy data · column truth from migrations · PR workflow with Co-authored-by trailer).
+The model lab (planning artifact + my feedback loop) is at ~/Documents/prism-model-lab —
+`node server.mjs` → localhost:4600; its public/content.js is the live spec the doc mirrors;
+check feedback.json for my unprocessed comments and process them first if any are status "new".
+KEY CONTEXT: the APP still implements the v1 model; the SPEC is v3.0 (main index 15/35/50
+Core-6 + separate Harness index 12–15 + linkage engine + KPI 9 on deploy events). Do not
+change scoring code until I explicitly say "implement v3.0". After reading, tell me the
+current state in 5 lines and wait for my instruction.
+```
 
 **Still open (follow-ups, no code yet):**
 1. **Over-linking** — the repo-scoped `coauthor`@0.60 fallback cartesian-links every same-repo session↔PR
