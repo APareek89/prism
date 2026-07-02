@@ -77,24 +77,84 @@ of truth: `prism-model-lab/public/content.js`.
    extensions only — data already on disk) → P3 KPI 9 T1 (GitHub Deployments) → P4 telemetry/org
    rollout + coaching plugin → P5 optional enrichment (Sentry/PagerDuty/extra perms).
 
-**APP vs SPEC gap (the next big implementation project):** the app still runs the v1 model — 13 KPIs,
-weights 10/25/40/25, retention/CFR/acceptance in the engine, multiplier scored, single index. Nothing
-in `lib/scoring` has been changed for v3.0. Do NOT partially implement; when the owner says
-"implement v3.0", follow scoring-model.md's open-decisions table and ship via dogfood PRs.
+**APP vs SPEC gap:** the PRODUCTION app still runs the v1 model — 13 KPIs, weights 10/25/40/25,
+retention/CFR/acceptance in the engine, multiplier scored, single index. Nothing in
+`apps/web/lib/scoring` has been changed for v3.0 (parked, still 143 tests green). When the owner
+says "implement v3.0" for real data, follow scoring-model.md's open-decisions table.
+
+## V3 PREVIEW APP (branch `feat/v3-preview`, 2026-07-02) — BUILT · PR OPEN · DO NOT MERGE
+
+A full v3.0 preview on DETERMINISTIC DUMMY DATA (owner-approved exception, scoped to Postgres
+schema `v3` only — recorded in CLAUDE.md; `npm run v3:reset` rebuilds the identical dataset).
+All work on this single branch; local only; PR open for architecture review with the backend
+teammate — **do not merge until the owner says so.**
+
+**Workspace restructure (the collaboration contract, git-mv'd, history preserved):**
+- `apps/web` — the Next.js app (owner's domain). v1 moved unchanged; v3 UI added under `/v3`.
+- `services/engine` — v3 scoring+insights+recs. Pure/deterministic/LLM-free, 47 unit tests
+  (incl. the lab Dev X worked example 21.8→L1). `npm run v3:recompute`.
+- `services/ingest` — TEAMMATE's domain: v3 migrations, annotated deterministic seed
+  (10 archetypes; the seed doubles as the ingestion spec), README = ingestion contract.
+- `packages/contract` — types generated from the live v3 schema (`npm run generate -w packages/contract`);
+  the only package all three import. Import rules: web→engine API only · nobody imports ingest.
+
+**What works end-to-end on :3010 (`.claude` launch `prism-dev`, or root `npm run dev` on :3000):**
+`/v3` team dashboard (10 archetypes, BOTH indexes, gates/bands/confidence, sortable, drill-down) ·
+`/v3/me` (Index tab: no actions · Live coaching: timed SIMULATED replay of `v3.coaching_events` ·
+Growth: CSS/SVG course grid + confirmed-hypothesis improvement areas + real `v3.user_context`
+inserts w/ optimistic UI + driving-improvement strip) · `/v3/configure` (whole model FROM the DB,
+weight edit, delete-KPI w/ proportional same-index redistribution summing to 100, save → NEW
+`config_versions` row → recompute → "config vN" chip everywhere). Verified in-browser (Playwright);
+screenshots committed at `docs/v3-preview/screenshots/`.
+
+**Teammate reading order:** (1) `services/ingest/README.md` · (2) `services/ingest/scripts/seed.mjs`
+(annotated table-by-table spec) · (3) `docs/scoring-model.md` · (4) `packages/contract`.
+
+**Preview decisions logged (revisit at real implementation):** per-KPI weights = dimension weights
+split equally inside each dimension (arithmetically identical to spec §2, gives Configure a per-KPI
+editor) · KPI 1 counts any-method links post-hardening, KPI 4 exact `pr_link` only · KPI 6 scores
+tokens_in+out, cache-read is a diagnostic share · revert PRs excluded from shipped-work
+denominators · self-caught revert insight keyed `ROUTE` (not H2) · confidence formula is a
+published preview shape (recalibrate) · engine asOf derived from data (no wall clock).
+
+**Gotchas found this session:** pg returns timestamptz as `Date` + bigint/numeric as strings —
+both engine (`run.ts`) and web (`lib/v3/db.ts`) register type parsers (ISO strings + Numbers) ·
+creating a SECOND `pg.Client` inside a Next dev route hangs at teardown — routes must reuse the
+pool (`recomputeWith(client)`) · persist is batched (chunked multi-row inserts; was ~1000 round
+trips ≈ 90s, now ~5s) · the Claude-Preview browser mis-renders streamed Suspense on this app —
+use the Playwright MCP for browser verification · AppShell moved from root layout into
+(views)/admin/auth group layouts so `/v3` renders standalone (v1 pages pixel-identical).
 
 ## Next session — paste-ready prompt (for the owner)
 ```
-Continue the Prism project at /Users/anandpareek/Documents/prism.
-FIRST read, in order: (1) handoff.md — status, v3.0 model decisions, app-vs-spec gap;
-(2) docs/scoring-model.md — the v3.0 model spec (the TARGET); (3) CLAUDE.md — hard rules
-(no dummy data · column truth from migrations · PR workflow with Co-authored-by trailer).
-The model lab (planning artifact + my feedback loop) is at ~/Documents/prism-model-lab —
-`node server.mjs` → localhost:4600; its public/content.js is the live spec the doc mirrors;
-check feedback.json for my unprocessed comments and process them first if any are status "new".
-KEY CONTEXT: the APP still implements the v1 model; the SPEC is v3.0 (main index 15/35/50
-Core-6 + separate Harness index 12–15 + linkage engine + KPI 9 on deploy events). Do not
-change scoring code until I explicitly say "implement v3.0". After reading, tell me the
-current state in 5 lines and wait for my instruction.
+Continue the Prism project at /Users/anandpareek/Documents/prism, branch feat/v3-preview
+(v3.0 PREVIEW on dummy data — BUILT, PR open, DO NOT MERGE).
+FIRST read, in order: (1) handoff.md — especially the "V3 PREVIEW APP" section (restructure
+map, preview decisions, gotchas); (2) docs/scoring-model.md — the v3.0 spec the preview
+implements; (3) CLAUDE.md — hard rules incl. the scoped v3-schema dummy-data exception;
+(4) services/ingest/README.md — the ingestion contract my backend teammate will review.
+ENVIRONMENT: Node 22 via `export PATH="$HOME/.nvm/versions/node/v22.22.0/bin:$PATH"`;
+dev server: launch config `prism-dev` → :3010 (verify in-browser with the PLAYWRIGHT MCP,
+not the Claude-Preview browser — it mis-renders this app's streamed Suspense);
+data: `npm run v3:reset` then `npm run v3:recompute` (deterministic).
+THEN DO, in order:
+1. Run a multi-agent adversarial review (Workflow tool) over `git diff main...feat/v3-preview`
+   with these finder lenses: owner-requirement compliance · model fidelity vs
+   docs/scoring-model.md (anchors/gates/bands/weights/linkage) · engine correctness (window
+   boundaries, null-honesty, double counting, pg coercions) · architecture boundaries (no NEW
+   code touching public.*, import rules web→engine/contract only, nobody imports ingest,
+   keyless boot, v1 lib/scoring unchanged) · UI/API bugs (optimistic updates, config save
+   race, validation) · seed determinism. Verify each finding with 2 skeptic agents before
+   accepting it. NOTE: workflow scripts reject the literal tokens for wall-clock/random
+   calls even inside prompt strings — phrase prompts as "unseeded randomness / wall-clock
+   time" instead.
+2. Fix confirmed critical/major findings on this branch; keep engine tests + typecheck +
+   build green (`npm run test:engine`, `npm run typecheck`, `npm run build`); re-verify
+   affected pages via Playwright; commit with the Co-Authored-By: Claude trailer; push.
+3. Process any review comments I or my teammate left on the PR
+   ("feat: v3.0 preview — workspaces split + dummy-data demo").
+HARD RULES: never write synthetic data outside schema v3 · never touch apps/web/lib/scoring
+(parked v1) · do NOT merge the PR · update handoff.md before ending.
 ```
 
 **Still open (follow-ups, no code yet):**
