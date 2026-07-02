@@ -15,6 +15,11 @@ oriented. Treat `handoff.md` as the project's memory — a session that doesn't 
 
 ## Hard rules (do not violate)
 - **No dummy/synthetic data — ever.** Only real ingested data. The only DB seed is `index_config` v1.
+  - **Scoped exception (owner-approved, `feat/v3-preview`): the `v3` Postgres schema only.** The v3.0
+    preview runs on deterministic dummy data seeded by `services/ingest/scripts/seed.mjs` into `v3.*`
+    tables (same Supabase project, separate schema). NEVER write synthetic rows to `public.*`. Every
+    v3 UI page carries a "DEMO DATA" banner. Remove/rebuild the whole preview world with
+    `npm run v3:reset` (drops schema v3 cascade → re-migrates → re-seeds; `public.*` untouched).
 - **Column truth = `supabase/migrations/*.sql`.** Before trusting any query, validate columns against the
   LIVE DB: `select <cols> from public.<table> limit 0` (via `pg` + `SUPABASE_DB_URL`,
   `node --env-file=.env.local`). This bit us repeatedly — subagents guess column names.
