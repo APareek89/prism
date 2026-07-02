@@ -8,6 +8,7 @@ Start here to navigate the design + build docs.
 | [`../../README.md`](../../README.md) | Quick start + milestones |
 | [`../testing.md`](../testing.md) | End-to-end testing path (reset → connect → PRs → run pipeline) |
 | [`../dogfooding.md`](../dogfooding.md) | How Prism measures its own development via PRs |
+| [`../scoring-model.md`](../scoring-model.md) | **Canonical scoring model** — dimensions + MECE rule, 13 KPIs w/ formulas + anchors, diagnostic trees, open decisions |
 | [`ownership-map.md`](ownership-map.md) | **Single-owner rules** — read before adding files (migrations, clients, types, auth) |
 | [`../superpowers/specs/2026-06-30-prism-mvp-design.md`](../superpowers/specs/2026-06-30-prism-mvp-design.md) | The MVP design spec (divergences, milestones) |
 | [`../superpowers/specs/2026-06-30-prism-architecture.md`](../superpowers/specs/2026-06-30-prism-architecture.md) | Full file-by-file architecture |
