@@ -97,6 +97,22 @@ triggers documented). Positioning now leads with cost ("where AI money goes"), w
 indexes explain the why. The roadmap still only sequences ratified decisions
 (scoring-model v3.0 + phase-2) — nothing in it changes the model.
 
+**Operating principle (2026-07-06, strategy-review arc — decided in-chat, no separate doc):**
+- **Irreversible asset = the cross-org intervention-outcome corpus** ("verified deltas":
+  recommendation → customer action → outcome verified from data). The evidence graph is the
+  substrate (customer-owned → retention); the corpus is the company asset (interventional,
+  cannot be backfilled or derived from observational data, compounds with trust × time).
+- **North-star metric: verified deltas per month.** Decision rule for any feature, connector,
+  customer ask, or partnership: does it raise the accumulation rate (more partner orgs ×
+  higher rec-adoption × shorter verification windows × better evidence quality)? If no,
+  it needs a strong justification.
+- Sequencing corollary: shortest verification windows build the corpus fastest — run-cost
+  actions verify against the next bill (~30d) vs practice interventions (~a quarter), so the
+  v1.1 cost-forward re-cut is corpus-optimal as well as wedge-optimal.
+- **Day zero of the corpus = first verified delta at a non-dogfood org.** Five design
+  partners precede everything; the accumulation rate is currently ~zero and that is the
+  company's real bottleneck (not model fidelity).
+
 ## Next session — paste-ready prompt (for the owner)
 ```
 Continue the Prism project at /Users/anandpareek/Documents/prism.
