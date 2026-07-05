@@ -112,6 +112,12 @@ indexes explain the why. The roadmap still only sequences ratified decisions
 - **Day zero of the corpus = first verified delta at a non-dogfood org.** Five design
   partners precede everything; the accumulation rate is currently ~zero and that is the
   company's real bottleneck (not model fidelity).
+- **Full strategy record → `docs/strategy/` (README = map + reading order).** Governance:
+  `operating-principle.md` (every decision) > `next-6-months.md` (sequencing, kill criteria —
+  GOVERNS; the prd/ roadmap is now the build library) > `design-partner-outreach.md` (live
+  action: 20 CTOs → 5 partners, note included). Reference: `ic-review-2026-07.md` (pass-with-
+  re-entry verdict), `inevitability-2026-07.md` (why-now + 10 answers), `awp-protocol-sketch.md`
+  + `awp-events-v0.md` (protocol thread, hard-capped at ~5% effort until customer #5).
 
 ## Next session — paste-ready prompt (for the owner)
 ```

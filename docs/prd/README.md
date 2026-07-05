@@ -15,6 +15,13 @@ truth-first (M1) and the workforce+spend join (our differentiation vs pure FinOp
 pulls run-cost forward (stage ① to Sep, gateway attribution to Jan), ends the year on **AI P&L
 v1**, and moves the Manager Enablement Index + DevOps function pack to the [backlog](backlog/).
 
+> **Sequencing governance (2026-07-06, strategy arc):** operational sequencing is now governed
+> by [`docs/strategy/next-6-months.md`](../strategy/next-6-months.md) (experiments with kill
+> criteria) under the decision rule in
+> [`docs/strategy/operating-principle.md`](../strategy/operating-principle.md). This roadmap
+> and its PRDs are the **build library** — pulled from as experiments justify, never executed
+> on autopilot.
+
 ## Where we start (July 2026)
 
 - App is built M0–M5 and runs the **v1 model**; the **v3.0 spec is ahead of the code** (gap table in [scoring-model.md](../scoring-model.md)).
