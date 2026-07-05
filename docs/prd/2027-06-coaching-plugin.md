@@ -1,9 +1,9 @@
-# In-flow coaching plugin — Addendum B (M9 · Apr 2027)
+# In-flow coaching plugin — Addendum B (M11 · Jun 2027)
 
 > Status: Draft
 > Owner: Prism CPO
 > Last updated: 2026-07-06
-> Related: [scoring-model.md](../scoring-model.md) §8 (Addendum B) §9 (nudge rows), [M3 PRD](2026-10-linkage-engine.md), [roadmap](README.md)
+> Related: [scoring-model.md](../scoring-model.md) §8 (Addendum B) §9 (nudge rows), [M4 PRD](2026-11-linkage-engine.md), [roadmap](README.md)
 
 ## Context / Problem
 
@@ -15,7 +15,7 @@
 
 - Rules C1–C6 run in-flow on the developer's machine, need-gated by their own KPI profile, within the ≤500ms local budget.
 - The developer experience is assistance, not surveillance: enrich by default, ≤3 nudges/day, cooldowns, `/prism status` transparency, private Coaching tab.
-- Managers see anonymized themes only — per-IC coaching data never leaves the individual's view (guarantee already enforced at the M8 access layer).
+- Managers see anonymized themes only — per-IC coaching data never leaves the individual's view (guarantee already enforced at the M9 access layer).
 
 ## Non-goals
 
@@ -42,10 +42,10 @@
 
 **In scope**
 - The Prism plugin for Claude Code: UserPromptSubmit / PreToolUse (+ opt-in Stop) hooks with local rule evaluation ≤500ms; Prism's backend never on the blocking path.
-- KPI profile sync: per-person profile (KPI values vs targets, linkage priorities from M3) fetched and cached at session start.
+- KPI profile sync: per-person profile (KPI values vs targets, linkage priorities from M4) fetched and cached at session start.
 - Rules C1–C6 per the spec's gate/trigger/intervention table; intervention ladder enrich → coach → flag → block(off).
 - Guardrails: ≤3 nudges/day per developer, per-rule cooldowns, dismissed-rule quiet period, `/prism status`.
-- Metadata-only export: `{rule_id, trigger, intervention, outcome}` events to Prism; the Coaching tab (private) renders them; anonymized themes feed the manager aggregate (M8 floor applies).
+- Metadata-only export: `{rule_id, trigger, intervention, outcome}` events to Prism; the Coaching tab (private) renders them; anonymized themes feed the manager aggregate (M9 floor applies).
 - Adoption loop: nudge outcomes re-verified from scored data (did the KPI move?), closing the loop the same way recommendations already work.
 
 **Out of scope**
@@ -65,7 +65,7 @@
 - FR-8: Local evaluation completes within the ≤500ms budget; on any timeout or profile-fetch failure the plugin does nothing (fail-open, never blocks work).
 - FR-9: Guardrails enforced client-side: ≤3 nudges/day, per-rule cooldowns, dismissed rules quiet for N days; `/prism status` lists active rules, gates, and remaining budget.
 - FR-10: Only `{rule_id, trigger, intervention, outcome}` metadata is exported; prompt text and code content never leave the machine (boundary-tested in the plugin).
-- FR-11: The private Coaching tab shows the person their own coaching history and outcomes; no other role can access it (M8 denial tests extended).
+- FR-11: The private Coaching tab shows the person their own coaching history and outcomes; no other role can access it (M9 denial tests extended).
 - FR-12: Anonymized theme aggregates render for leads only above the minimum-N floor.
 - FR-13: Nudge effectiveness is measured from scored data (KPI movement after sustained rule activity), not self-report, and feeds the rule's own tuning backlog.
 
@@ -74,7 +74,7 @@
 - **Latency**: p95 local evaluation ≤500ms; zero added latency when no rule gates open.
 - **Privacy**: the three-mechanism design is the product guarantee — local extraction, local evaluation, outcome-side fingerprints; audited by plugin boundary tests + payload sampling.
 - **Reliability**: plugin failures are silent no-ops for the developer; the session never breaks because coaching broke.
-- **Simplicity**: the plugin is a local component + one profile endpoint + one events endpoint; no new services; distribution is a settings push (same MDM rail as M6).
+- **Simplicity**: the plugin is a local component + one profile endpoint + one events endpoint; no new services; distribution is a settings push (same MDM rail as M7).
 
 ## Open questions
 
@@ -108,5 +108,5 @@
 ## References
 
 - Spec: [scoring-model.md](../scoring-model.md) §8 (ladder, C1–C6, guardrails, three privacy mechanisms), §9 nudge rows, cadence rule in §1
-- Inputs: KPI profiles ([M1](2026-08-core6-main-index.md)/[M2](2026-09-harness-index.md)), linkage priorities ([M3](2026-10-linkage-engine.md)), access rules ([M8](2027-03-org-rollup-dashboard.md))
+- Inputs: KPI profiles ([M1](2026-08-core6-main-index.md)/[M3](2026-10-harness-index.md)), linkage priorities ([M4](2026-11-linkage-engine.md)), access rules ([M9](2027-04-org-rollup-dashboard.md))
 - Related: adoption loop (`lib/adoption/`), recommendations (`lib/recommendations/`)

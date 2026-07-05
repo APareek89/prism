@@ -1,4 +1,4 @@
-# Change Reliability Tier-1 — KPI 9 on deploy events (M4 · Nov 2026)
+# Change Reliability Tier-1 — KPI 9 on deploy events (M10 · May 2027)
 
 > Status: Draft
 > Owner: Prism CPO
@@ -48,7 +48,7 @@
 **Out of scope**
 - Sentry hygiene checker and Tier-2 activation (P5).
 - Severity weighting by affected users (Tier-3, P5).
-- Promotion itself into the Outcomes core — a config flip executed only after the clean month completes (likely Dec).
+- Promotion itself into the Outcomes core — a config flip executed only after the clean month completes (likely Jun).
 
 ## Functional requirements
 
@@ -88,7 +88,7 @@
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| Dogfood deploy events sparse (few deploys/month) | high | med | Small-sample banner + confidence gate already standard; pilot-org data (Q3) grows N |
+| Dogfood deploy events sparse (few deploys/month) | high | med | Small-sample banner + confidence gate already standard; pilot-org data grows N |
 | Deploy system records no rollbacks (H0) | med | high | Explicit "unmeasurable until connected" state; setup guide for deploy-status emission |
 | Batch deploys blur attribution | med | med | Low-confidence flag on multi-PR deploys; recommend smaller batches via diagnostic H3 |
 | Rule mismatch with org's actual hotfix habits | med | med | Rule text published in-product; per-org rule-leg configuration kept minimal |

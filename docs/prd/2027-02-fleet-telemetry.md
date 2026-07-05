@@ -1,4 +1,4 @@
-# Fleet telemetry ingestion — the org data plane (M6 · Jan 2027)
+# Fleet telemetry ingestion — the org data plane (M7 · Feb 2027)
 
 > Status: Draft
 > Owner: Prism CPO
@@ -19,7 +19,7 @@
 
 ## Non-goals
 
-- No coaching plugin (M9) — telemetry is passive capture; nothing runs hooks yet.
+- No coaching plugin (M11) — telemetry is passive capture; nothing runs hooks yet.
 - No edit-level depth/survival capture beyond what Claude Code's telemetry exports today; those 📎 signals stay null where data doesn't exist (honest nulls).
 - No MDM tooling itself — we document the managed-settings payload; fleet push is the org's MDM job.
 - No non-Claude AI tools (Copilot etc.) — multi-tool stays a future decision.
@@ -49,8 +49,8 @@
 
 **Out of scope**
 - A standalone collector service — the app IS the collector (architecture guardrail: API route before new infra; revisit only if volume forces it).
-- Prompt-quality flags computed server-side (they are computed on-machine by design; plugin arrives M9).
-- Cross-person skill identity surfaces (AI Leaders UI lands with M8; the data starts accruing now).
+- Prompt-quality flags computed server-side (they are computed on-machine by design; plugin arrives M11).
+- Cross-person skill identity surfaces (AI Leaders UI lands with M9; the data starts accruing now).
 
 ## Functional requirements
 
@@ -106,4 +106,4 @@
 
 - Spec: [scoring-model.md](../scoring-model.md) §4 (Claude Code row: OTLP, org token, MDM, identity map), §8 privacy mechanisms, §11 P4
 - Code: `lib/connectors/claude-code/` (parser = the parity reference), `cc_sessions` schema in `supabase/migrations/`
-- Consumers unblocked: cadence H0 coverage, AI Leaders data accrual (M8), coaching reach (M9)
+- Consumers unblocked: cadence H0 coverage, AI Leaders data accrual (M9), coaching reach (M11)

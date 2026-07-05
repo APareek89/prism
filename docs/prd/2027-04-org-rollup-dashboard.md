@@ -1,15 +1,15 @@
-# Org rollup & management dashboard (M8 · Mar 2027)
+# Org rollup & management dashboard (M9 · Apr 2027)
 
 > Status: Draft
 > Owner: Prism CPO
 > Last updated: 2026-07-06
-> Related: [phase-2.md](../phase-2.md) §2–§4, [M7 PRD](2027-02-onboarding-roster.md), [roadmap](README.md)
+> Related: [phase-2.md](../phase-2.md) §2–§4, [M8 PRD](2027-03-onboarding-roster.md), [roadmap](README.md)
 
 ## Context / Problem
 
 - Scores exist per person and per function, but leadership has no surface: no org number, no cross-function view, no scope chain. The function-scope improvement panel is empty today because KPIs persist at employee scope only (open follow-up #3 in [handoff.md](../../handoff.md)).
 - Phase-2 §2–§4 defines the org story: headcount-weighted rollup with three honesty guards, a management dashboard that is deliberately **not a league table**, and a scope chain (Org → Function → Team → Individual) with role-based visibility.
-- AI Leaders recognition (v3.0 §7 multiplier ledger) belongs on this surface — the org header counts them, and cross-person skill-usage data has been accruing since M6.
+- AI Leaders recognition (v3.0 §7 multiplier ledger) belongs on this surface — the org header counts them, and cross-person skill-usage data has been accruing since M7.
 
 ## Goals
 
@@ -19,8 +19,8 @@
 
 ## Non-goals
 
-- No cross-pack score comparison, anywhere, ever (Phase-2 hard rule) — only Engineering is live yet, but the UI rules are built now so M10 can't violate them.
-- No Manager Enablement Index (M11) — manager rows show team aggregates, not manager scores.
+- No cross-pack score comparison, anywhere, ever (Phase-2 hard rule) — only Engineering is live yet, but the UI rules are built now so a future pack month can't violate them (the DevOps pack now sits on the backlog).
+- No Manager Enablement Index (backlog) — manager rows show team aggregates, not manager scores.
 - No org-rollup weighting overrides (open decision Phase-2 §10-2; default headcount weighting only this month).
 - No new data capture — this month aggregates and presents what exists.
 
@@ -59,7 +59,7 @@
 
 - FR-1: Function-level KPI and index rows persist per pipeline run; function panels consume them (no on-the-fly aggregation of employee rows in views).
 - FR-2: Org MAIN and Org HARNESS compute as headcount-weighted averages over functions whose confidence clears the publish floor; the two org numbers never blend.
-- FR-3: The org header always states coverage: "covers N% of workforce; X people pending data" — computed from roster eligibility (M7) and published-score coverage.
+- FR-3: The org header always states coverage: "covers N% of workforce; X people pending data" — computed from roster eligibility (M8) and published-score coverage.
 - FR-4: Every org-level delta renders its decomposition (points from function improvement vs points from headcount-mix shift) as the "what moved the org" line.
 - FR-5: The function summary table shows one row per active function with the spec's columns; default sort is headcount; score-based sorting is not offered.
 - FR-6: Every displayed number at every level carries its confidence chip — no naked numbers at org scale.
@@ -94,7 +94,7 @@
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| One-function degenerate case makes org surfaces look redundant | high | low | Honest rendering + explicit "1 function active" framing; M10 adds the second function |
+| One-function degenerate case makes org surfaces look redundant | high | low | Honest rendering + explicit "1 function active" framing; a second function arrives when the DevOps pack leaves the backlog |
 | Mix-shift decomposition confuses first-time readers | med | med | One-line prose rendering ("+4 from improvement, −1 from mix"), tooltip explainer |
 | RBAC generalization breaks existing view queries | med | high | Denial-test suite from M5 extended per role×level before UI work lands |
 | Recognition reads as ranking | med | med | AI Leaders is an unordered distinction list with evidence, never a scored leaderboard position |

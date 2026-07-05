@@ -20,7 +20,7 @@
 
 ## Non-goals
 
-- Harness index (M2), linkage engine (M3), KPI 9 tiering (M4).
+- Harness index (M3), linkage engine (M4), KPI 9 tiering (M10).
 - No new connectors, GitHub permissions, or telemetry.
 - No coaching or nudges — this month is measurement only.
 - No re-litigation of v3.0 decisions; the spec is the contract.

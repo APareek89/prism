@@ -1,13 +1,13 @@
-# Onboarding wizard & roster (M7 · Feb 2027)
+# Onboarding wizard & roster (M8 · Mar 2027)
 
 > Status: Draft
 > Owner: Prism CPO
 > Last updated: 2026-07-06
-> Related: [phase-2.md](../phase-2.md) §6, [M5 PRD](2026-12-production-multi-user.md), [M6 PRD](2027-01-fleet-telemetry.md), [roadmap](README.md)
+> Related: [phase-2.md](../phase-2.md) §6, [M5 PRD](2026-12-production-multi-user.md), [M7 PRD](2027-02-fleet-telemetry.md), [roadmap](README.md)
 
 ## Context / Problem
 
-- Prism can now host multiple authenticated users (M5) with real usage data (M6) — but getting a company from zero to configured still requires hand-holding: manual employee creation, manual identity fixes, no notion of teams or eligibility.
+- Prism can now host multiple authenticated users (M5) with real usage data (M7) — but getting a company from zero to configured still requires hand-holding: manual employee creation, manual identity fixes, no notion of teams or eligibility.
 - Phase-2 §6 defines the answer: a three-step wizard (pick functions → CSV roster → eligibility flags) whose goal is **a company reaching first honest numbers without a services engagement**.
 - Q3's pilot org is the forcing function: this month is the difference between "demo" and "product".
 
@@ -20,9 +20,9 @@
 ## Non-goals
 
 - No SCIM/SSO roster sync — CSV first, SCIM v2 (Phase-2 decision table); tables stay designed to accept both.
-- No non-engineering function packs (M10) — the function picker ships with Engineering active and other packs visibly "coming", never a blank-slate KPI builder.
+- No non-engineering function packs (the DevOps pack moved to the backlog, owner decision 2026-07-06) — the function picker ships with Engineering active and other packs visibly "coming", never a blank-slate KPI builder.
 - No connector admin redesign (parked, owned separately per Phase-2 §5).
-- No Manager Enablement Index scoring (M11) — this month only routes and stores the flag.
+- No Manager Enablement Index scoring (moved to the backlog) — this month only routes and stores the flag.
 
 ## Users / Personas
 
@@ -45,7 +45,7 @@
 - Step 2 — Roster CSV: columns `name, email, function, team, manager_email, role (IC/lead)`, optional `github_handle`, `ai_tool_account`; parse → validate → dry-run preview → apply; idempotent upsert keyed on email.
 - Unmatched-account resolution screen (extends the existing `match_status` model): pending identities listed with suggested candidates, resolved only by explicit admin action.
 - Step 3 — Eligibility flags: leads/managers excluded from IC scoring by default (routed to the manager index when it ships); contractors/interns configurable (included / excluded / tracked separately).
-- Team structure: `team` and `manager_email` land as first-class scoping data (feeds M8's scope chain).
+- Team structure: `team` and `manager_email` land as first-class scoping data (feeds M9's scope chain).
 
 **Out of scope**
 - SCIM connector, HRIS integrations.
@@ -92,7 +92,7 @@
 |------|------------|--------|------------|
 | Real-world CSVs are messier than the spec (encodings, aliases, half-filled rows) | high | med | Per-row errors with downloadable error report; dry-run absorbs the mess before writes |
 | Identity resolution backlog stalls scoring for new people | med | med | Pending people score on what IS matched (e.g. GitHub-only) with coverage stated; resolution screen surfaces count loudly |
-| Eligibility defaults surprise managers ("where's my score?") | med | low | Explicit "measured as manager — index ships in June" state; never a blank |
+| Eligibility defaults surprise managers ("where's my score?") | med | low | Explicit "measured as manager — enablement index on the backlog" state; never a blank |
 | Wizard scope creep into connector admin | med | med | Connector admin is parked by decision (Phase-2 §5); wizard links to existing Admin, doesn't rebuild it |
 
 ## Success metrics
@@ -106,4 +106,4 @@
 
 - Spec: [phase-2.md](../phase-2.md) §6 (wizard steps, CSV rules, eligibility), §8 defaults (CSV first, SCIM v2)
 - Code: `lib/onboarding/provision.ts`, `employees.match_status` model, `lib/connectors/identity.ts`
-- Consumers: [M8 org rollup](2027-03-org-rollup-dashboard.md) (scope chain), [M11 manager index](2027-06-manager-enablement-index.md) (lead routing)
+- Consumers: [M9 org rollup](2027-04-org-rollup-dashboard.md) (scope chain), [manager index (backlog)](backlog/manager-enablement-index.md) (lead routing)

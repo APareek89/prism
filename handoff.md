@@ -84,14 +84,18 @@ in `lib/scoring` has been changed for v3.0. Do NOT partially implement; when the
 
 **Phase-2 spec** (org scaling: function packs · org rollup · manager index · onboarding) → `docs/phase-2.md` — aligned 2026-07-02, not implemented.
 
-**Product roadmap (2026-07-06, DRAFT — awaiting owner ratification):** 1-year roadmap
+**Product roadmap (2026-07-06, v1.1 DRAFT — awaiting owner ratification):** 1-year roadmap
 (Aug 2026 → Jul 2027), one feature/month with a full PRD each, at **`docs/prd/`**
-(`README.md` = the roadmap + index). Q1 ships v3.0 in code (Core-6 → Harness → linkage),
-Q2 = reliability T1 + production multi-user + fleet telemetry, Q3 = onboarding + org rollup +
-coaching plugin, Q4 = DevOps pack + manager index + run-cost 2a. M1 (Aug) = the "implement
-v3.0" project incl. the over-linking fix; each PRD lists its open questions for the owner.
-The roadmap only sequences already-ratified decisions (scoring-model v3.0 + phase-2) —
-nothing in it changes the model.
+(`README.md` = the roadmap + index). **v1.1 = hybrid re-cut after an investor-perspective
+review** (owner-approved in-session): run-cost pulled forward as the market wedge — M2 (Sep) =
+2a stage ① bill visibility, M6 (Jan) = stage ② gateway-tag attribution, M12 (Jul) = **AI P&L
+v1** (2a unit economics + 2b seats + the training-vs-procurement join). Workforce spine kept:
+M1 Core-6 v3.0 (incl. over-linking fix) → M3 Harness → M4 linkage → M5 prod multi-user →
+M7 telemetry → M8 onboarding → M9 org rollup → M10 reliability T1 → M11 coaching plugin.
+**Manager Enablement Index + DevOps pack → `docs/prd/backlog/`** (deferred, reconsider
+triggers documented). Positioning now leads with cost ("where AI money goes"), workforce
+indexes explain the why. The roadmap still only sequences ratified decisions
+(scoring-model v3.0 + phase-2) — nothing in it changes the model.
 
 ## Next session — paste-ready prompt (for the owner)
 ```

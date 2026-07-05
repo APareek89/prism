@@ -8,7 +8,7 @@
 ## Context / Problem
 
 - Prism runs single-user in DEMO_MODE on one laptop: no real Supabase session, service-role reads, RLS bypassed locally. Production paths exist by design (real RLS client when `DEMO_MODE=false`) but have never carried real users.
-- The org roadmap (M6–M8) is meaningless without multiple authenticated humans in one deployment. This month turns the architecture's multi-user readiness ("org = me = team today, multi-employee-ready") into a running production system.
+- The org roadmap (M7–M9) is meaningless without multiple authenticated humans in one deployment. This month turns the architecture's multi-user readiness ("org = me = team today, multi-employee-ready") into a running production system.
 - Deploy target has always been **Render** (decision 1); `render.yaml` is a stub.
 
 ## Goals
@@ -19,8 +19,8 @@
 
 ## Non-goals
 
-- No Claude-usage data for teammates yet — that requires telemetry (M6). Their Usage/Efficiency KPIs render honest nulls ("awaiting signal") this month; GitHub-side data (PRs) flows where handles match.
-- No CSV roster wizard or eligibility flags (M7).
+- No Claude-usage data for teammates yet — that requires telemetry (M7). Their Usage/Efficiency KPIs render honest nulls ("awaiting signal") this month; GitHub-side data (PRs) flows where handles match.
+- No CSV roster wizard or eligibility flags (M8).
 - No SSO/SCIM (Phase-2 v2 decision); Supabase email magic-link (+ Google OAuth if free) is enough.
 - No billing, no multi-tenant (one org per deployment this year).
 
@@ -92,7 +92,7 @@
 |------|------------|--------|------------|
 | RLS gaps discovered late (policies never carried real sessions) | med | high | W2 dedicated denial-test pass per table per role, before deploy |
 | December capacity (holidays) | high | med | Platform-only scope, no model changes; W4 is burn-in, not build |
-| Teammate null KPIs read as "Prism is broken" | med | low | Explicit "awaiting signal — telemetry arrives next month" empty state |
+| Teammate null KPIs read as "Prism is broken" | med | low | Explicit "awaiting signal — fleet telemetry arrives in February (M7)" empty state |
 | Webhook/env drift between local and prod | med | med | Single runbook as source of truth; `--check` migration inspection against prod before apply |
 
 ## Success metrics

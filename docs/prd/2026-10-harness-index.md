@@ -1,4 +1,4 @@
-# Harness Index — KPIs 12–15 (M2 · Sep 2026)
+# Harness Index — KPIs 12–15 (M3 · Oct 2026)
 
 > Status: Draft
 > Owner: Prism CPO
@@ -9,7 +9,7 @@
 
 - v3.0's headline decision is the **two-index structure**: proficiency is a driver, not a sibling outcome — inside the main index it double-counts. M1 shipped the MAIN index; the HARNESS index does not exist in code yet.
 - The evidence is **already on disk**: session logs contain every tool call, skill invocation, and file read. This month is parser extensions, not new integrations (build order P2).
-- Without the Harness index, the linkage engine (M3) has nothing to correlate and coaching (M9) has no need-gates for practice rules.
+- Without the Harness index, the linkage engine (M4) has nothing to correlate and coaching (M11) has no need-gates for practice rules.
 
 ## Goals
 
@@ -19,8 +19,8 @@
 
 ## Non-goals
 
-- No linkage engine (M3) — this month produces the practice scores, not the harness→outcome proof.
-- No realtime nudges (M9); the KPIs list their future coaching hooks but nothing fires.
+- No linkage engine (M4) — this month produces the practice scores, not the harness→outcome proof.
+- No realtime nudges (M11); the KPIs list their future coaching hooks but nothing fires.
 - No telemetry — local session logs only.
 - No merge of KPIs 13+14 (open decision; revisit after first real data).
 
@@ -47,7 +47,7 @@
 
 **Out of scope**
 - CI corroboration via Checks permission (P5 enrichment).
-- Org-wide skill registry / cross-person skill identity (needs telemetry, M6).
+- Org-wide skill registry / cross-person skill identity (needs telemetry, M7).
 - The 70/30 rate/breadth blend for KPI 13 (post-calibration decision).
 
 ## Functional requirements
