@@ -65,6 +65,9 @@ export {
 // ── Claude Code connector entry points (./claude-code) ───────────────────────
 export { ingestClaudeCode, scanLocalSessions } from './claude-code';
 
+// ── Codex connector entry point (./codex) — cc_sessions with source='codex' ──
+export { ingestCodex } from './codex';
+
 // ── Sentry connector entry point (./sentry) ──────────────────────────────────
 export { ingestSentry } from './sentry';
 

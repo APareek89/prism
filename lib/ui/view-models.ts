@@ -160,7 +160,7 @@ export interface CourseDTO {
 
 /** Admin connector card. */
 export interface ConnectorCardDTO {
-  type: 'github' | 'claude_code' | 'sentry';
+  type: 'github' | 'claude_code' | 'codex' | 'sentry';
   name: string;
   connected: boolean;
   statusLabel: string; // "Connected" / "Not configured"

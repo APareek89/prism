@@ -13,7 +13,7 @@
 import type { ConnectorCardDTO } from '@/lib/ui/view-models';
 import { RunPipelineButton } from './RunPipelineButton';
 
-/** The three connector types the design ships, in display order. */
+/** The connector types the Admin grid ships, in display order (codex: 0034). */
 const CONNECTOR_ORDER: Array<{ type: ConnectorCardDTO['type']; name: string; powers: string }> = [
   {
     type: 'github',
@@ -26,6 +26,12 @@ const CONNECTOR_ORDER: Array<{ type: ConnectorCardDTO['type']; name: string; pow
     name: 'Claude Code',
     powers:
       'OpenTelemetry export: tokens & cost by model, sessions, accept/reject, skill.name, prompt length. Drives Usage, Efficiency, Proficiency & tokens/PR.',
+  },
+  {
+    type: 'codex',
+    name: 'Codex',
+    powers:
+      'Local ~/.codex rollouts: sessions, tokens by model, prompts. Drives Usage & tokens/PR. Links to PRs via branch/coauthor only (no pr-link event — lower confidence).',
   },
   {
     type: 'sentry',

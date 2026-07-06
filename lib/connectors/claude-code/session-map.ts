@@ -48,8 +48,11 @@ function adminDb(): AdminDb {
   return createAdminClient() as unknown as AdminDb;
 }
 
+/** Which AI coding agent produced a session row (cc_sessions.source, migration 0034). */
+export type SessionSource = 'claude_code' | 'codex';
+
 /** The cc_sessions insert payload — keys are EXACT column names from 0008 (+ pr_refs
- *  added in migration 0033). */
+ *  added in migration 0033, + source added in 0034). */
 export interface CcSessionInsert {
   function_id: string;
   employee_id: string | null;
@@ -72,6 +75,8 @@ export interface CcSessionInsert {
   /** PRs this session opened/pushed (Claude Code `pr-link` events). jsonb array of
    *  {repo, number}. The exact first-party join key the AI→PR linker reads. */
   pr_refs: Array<{ repo: string; number: number }>;
+  /** which agent produced this row: 'claude_code' | 'codex' (migration 0034). */
+  source: SessionSource;
 }
 
 /** What a write returns: how many rows were upserted + the BYO classification. */
@@ -87,8 +92,10 @@ export function toCcSessionRow(
   s: RawSession,
   functionId: string,
   employeeId: string | null,
+  source: SessionSource = 'claude_code',
 ): CcSessionInsert {
   return {
+    source,
     function_id: functionId,
     employee_id: employeeId,
     account_uuid: null, // Landmine #1: no top-level uuid in local .jsonl.
@@ -174,6 +181,7 @@ export async function ensureSelfEmployee(functionId: string): Promise<string | n
 export async function persistSessions(
   functionId: string,
   sessions: readonly RawSession[],
+  source: SessionSource = 'claude_code',
 ): Promise<PersistResult> {
   const errors: string[] = [];
 
@@ -194,7 +202,7 @@ export async function persistSessions(
   // 3) Build rows: matched → bound to selfId; unmatched → employee_id null.
   const rows: CcSessionInsert[] = sessions.map((s) => {
     const isMatched = boundKeys.has(sessionKey(s));
-    return toCcSessionRow(s, functionId, isMatched ? selfId : null);
+    return toCcSessionRow(s, functionId, isMatched ? selfId : null, source);
   });
 
   // 4) Upsert on the UNIQUE(session_id, repo) constraint.

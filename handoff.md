@@ -99,10 +99,27 @@ change scoring code until I explicitly say "implement v3.0". After reading, tell
 current state in 5 lines and wait for my instruction.
 ```
 
+**Session 2026-07-06 — Month-1 build, part 1 (link integrity + Codex connector):**
+- **Over-linking FIXED** (was follow-up #1): new pure `lib/connectors/link/select.ts` —
+  cwd-split sessions canonicalized to ONE candidate per `session_id` (pr_refs unioned, real
+  branch wins), `coauthor` links suppressed on any PR covered by an exact `pr_link`/`sha`
+  match. `linkAiToPr` is now RECONCILING: stale stored links (incl. the 22 cartesian
+  coauthor rows) are deleted on re-run; `gh_prs.ai_assisted` + `cc_sessions.linked_pr` are
+  un-marked when links disappear. Run "Run pipeline now" once to apply the correction.
+- **Codex connector (owner decision — Month 1 scope):** `lib/connectors/codex/*` parses local
+  `~/.codex` rollout .jsonl (env `CODEX_LOCAL_SESSIONS_DIR`, keyless-safe) into the SAME
+  `cc_sessions` store with **`source='codex'`** (migration **0034**: enum value + column +
+  check, applied to live DB; 288 existing rows backfilled `claude_code`). Codex emits NO
+  `pr-link` event → links ride branch/sha/coauthor only (lower confidence, shown honestly).
+  Parser format assumptions are flagged in its header — verify against real rollouts (H0).
+- Admin grid + status route render the 4th connector card. Tests 254 pass (new: select +
+  codex parser suites) · typecheck + build clean. NOTE: `npm run db:migrate` in package.json
+  calls the absent Supabase CLI — use `node --env-file=.env.local scripts/db-migrate.mjs`.
+  Pre-existing keyless-build gap found: `/admin` prerender fails with NO `.env.local`
+  (violates ownership-map invariant; spawned as separate task).
+
 **Still open (follow-ups, no code yet):**
-1. **Over-linking** — the repo-scoped `coauthor`@0.60 fallback cartesian-links every same-repo session↔PR
-   (22 of 50 links; each of 10 PRs tied to all 5 sessions). Suppress it when `pr_link` already covers a PR +
-   de-dupe cwd-split sessions. Violates the no-false-links rule; inflates per-PR iteration attribution.
+1. ~~Over-linking~~ — **RESOLVED 2026-07-06** (see session block above).
 2. **`ai_code_retention_30d` premature 0** — freshly-merged AI lines (<30d, not re-checked) score 0 instead
    of pending/null, dragging Effectiveness 100→66.7 and L1 ~46.5→33.2.
 3. **Function-scope improvement panel empty** — engine emits `kpi_daily` only at employee scope, so function

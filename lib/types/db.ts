@@ -54,8 +54,8 @@ export type KpiId =
 /** Application roles (DB `app_role`, PRD §12.5). */
 export type AppRole = 'developer' | 'manager' | 'function_lead' | 'admin';
 
-/** Connector kinds (DB `connector_type`). */
-export type ConnectorType = 'github' | 'claude_code' | 'sentry';
+/** Connector kinds (DB `connector_type`; 'codex' added in migration 0034). */
+export type ConnectorType = 'github' | 'claude_code' | 'codex' | 'sentry';
 
 /** Connector health surfaced in Admin chrome. */
 export type ConnectorStatus = 'not_configured' | 'connected' | 'syncing' | 'error';

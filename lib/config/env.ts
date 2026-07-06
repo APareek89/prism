@@ -72,6 +72,9 @@ const serverSchema = z.object({
   // Claude Code telemetry (M2)
   CLAUDE_LOCAL_SESSIONS_DIR: z.string().default('~/.claude'),
 
+  // OpenAI Codex CLI local rollouts (multi-agent step 1, migration 0034)
+  CODEX_LOCAL_SESSIONS_DIR: z.string().default('~/.codex'),
+
   // Sentry (M2)
   SENTRY_AUTH_TOKEN: z.string().optional(),
   SENTRY_ORG: z.string().optional(),
@@ -202,7 +205,7 @@ export function requireServiceRoleKey(): string {
 // isConfigured — the optional-connector probe used by Admin + lazy clients.
 // ---------------------------------------------------------------------------
 
-export type Connector = 'supabase' | 'anthropic' | 'github' | 'claudeCode' | 'sentry' | 'resend' | 'inngest' | 'learningStudio';
+export type Connector = 'supabase' | 'anthropic' | 'github' | 'claudeCode' | 'codex' | 'sentry' | 'resend' | 'inngest' | 'learningStudio';
 
 /** True when every env var a connector needs is present. Never throws. */
 export function isConfigured(connector: Connector): boolean {
@@ -216,6 +219,8 @@ export function isConfigured(connector: Connector): boolean {
         return Boolean(serverEnv.GITHUB_APP_ID && serverEnv.GITHUB_APP_PRIVATE_KEY);
       case 'claudeCode':
         return Boolean(serverEnv.CLAUDE_LOCAL_SESSIONS_DIR);
+      case 'codex':
+        return Boolean(serverEnv.CODEX_LOCAL_SESSIONS_DIR);
       case 'sentry':
         return Boolean(serverEnv.SENTRY_AUTH_TOKEN && serverEnv.SENTRY_ORG && serverEnv.SENTRY_PROJECT);
       case 'resend':
