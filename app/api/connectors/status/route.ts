@@ -17,8 +17,8 @@ import { ok, resolveBootstrapFunctionId, errMessage } from '../_lib/route-helper
 
 export const dynamic = 'force-dynamic';
 
-/** The three connector types the Admin grid renders, in display order. */
-const CONNECTOR_TYPES: ConnectorType[] = ['github', 'claude_code', 'sentry'];
+/** The connector types the Admin grid renders, in display order (codex: 0034). */
+const CONNECTOR_TYPES: ConnectorType[] = ['github', 'claude_code', 'codex', 'sentry'];
 
 /** Whether the env for a given connector type is present (configured probe). */
 function configuredFor(type: ConnectorType): boolean {
@@ -27,6 +27,8 @@ function configuredFor(type: ConnectorType): boolean {
       return isConfigured('github');
     case 'claude_code':
       return isConfigured('claudeCode');
+    case 'codex':
+      return isConfigured('codex');
     case 'sentry':
       return isConfigured('sentry');
     default:
@@ -57,6 +59,7 @@ export const GET = withAdmin(async (): Promise<Response> => {
   const base: Record<ConnectorType, ConnectorHealthDTO> = {
     github: emptyHealth('github'),
     claude_code: emptyHealth('claude_code'),
+    codex: emptyHealth('codex'),
     sentry: emptyHealth('sentry'),
   };
 

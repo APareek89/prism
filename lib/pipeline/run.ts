@@ -18,6 +18,7 @@
 import {
   ingestGitHub,
   scanLocalSessions,
+  ingestCodex,
   ingestSentry,
   linkAiToPr,
   refreshBlame,
@@ -120,6 +121,13 @@ export async function runPipeline(args: RunPipelineArgs): Promise<PipelineSummar
   await step(steps, 'ingest:claude_code', isConfigured('claudeCode'), async () => {
     const r = await scanLocalSessions(functionId);
     if (r.errors?.length) errors.push(...r.errors.map((e) => `claude_code: ${e}`));
+    return `written=${r.written} skipped=${r.skipped}`;
+  });
+
+  // Codex reads LOCAL ~/.codex rollout files — keyless-safe (dir has a default).
+  await step(steps, 'ingest:codex', isConfigured('codex'), async () => {
+    const r = await ingestCodex(functionId);
+    if (r.errors?.length) errors.push(...r.errors.map((e) => `codex: ${e}`));
     return `written=${r.written} skipped=${r.skipped}`;
   });
 

@@ -47,6 +47,11 @@ const CONNECTOR_DEFS: Array<{
     name: 'Claude Code',
     powers: 'sessions, tokens, suggestions, skills, cost lens',
   },
+  {
+    type: 'codex',
+    name: 'Codex',
+    powers: 'local rollout sessions, tokens, models (weaker AI→PR links: no pr-link event)',
+  },
   { type: 'sentry', name: 'Sentry', powers: 'deploys, incidents, change-failure, MTTR' },
 ];
 

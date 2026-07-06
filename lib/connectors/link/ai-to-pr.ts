@@ -1,12 +1,14 @@
 // lib/connectors/link/ai-to-pr.ts
 //
 // The AI→PR link step (PRD §6, migration 0010 pr_ai_link). For every merged PR in the
-// trailing ingest window, find candidate Claude Code sessions by branch / sha /
-// coauthor, score the strongest signal (lib/connectors/link/match-keys), and persist:
-//   • pr_ai_link(pr_id, cc_session_id, method, confidence, function_id)  — UPSERT on
-//     the UNIQUE(pr_id, cc_session_id) constraint.
-//   • gh_prs.ai_assisted = true  for every linked PR.
-//   • cc_sessions.linked_pr = <pr id>  for every linked session.
+// trailing ingest window, find candidate AI sessions (Claude Code + Codex — one store,
+// cc_sessions) by pr_link / sha / branch / coauthor, score the strongest signal
+// (lib/connectors/link/match-keys), harden the selection (lib/connectors/link/select:
+// cwd-split de-dupe + weak-link suppression), RECONCILE stored links against the fresh
+// set (stale links from earlier over-linking runs are deleted), and persist:
+//   • pr_ai_link(pr_id, cc_session_id, method, confidence, function_id)
+//   • gh_prs.ai_assisted = true for linked PRs / false for window PRs no longer linked
+//   • cc_sessions.linked_pr = <pr id> for linked sessions (cleared when stale)
 //
 // CORRELATIONAL ONLY — this association never feeds the AI-Native Index; it powers the
 // "AI-assisted" badge + the correlational lens. Writes via the SERVICE-ROLE client.
@@ -15,6 +17,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { ingestWindow } from '@/lib/connectors/window';
 import { scoreMatch, type LinkMethod, type PrKeys, type PrRef, type SessionKeys } from './match-keys';
+import {
+  canonicalizeSessions,
+  selectLinks,
+  type ScoredLink,
+  type SessionRowLite,
+} from './select';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Loose query surface (the generated Database has empty Tables)
@@ -31,6 +39,7 @@ interface LooseTable {
   select: (cols: string) => LooseResult;
   update: (patch: unknown) => LooseResult;
   upsert: (rows: unknown, opts?: { onConflict?: string; ignoreDuplicates?: boolean }) => LooseResult;
+  delete: () => LooseResult;
 }
 interface LooseAdmin {
   from: (table: string) => LooseTable;
@@ -53,8 +62,10 @@ interface PrRow {
 }
 interface SessionRow {
   id: string;
+  session_id: string | null;
   repo: string | null;
   branch: string | null;
+  linked_pr: string | null;
   /** jsonb array of {repo, number} from Claude Code `pr-link` events (migration 0033). */
   pr_refs: Array<{ repo?: string; number?: number }> | null;
 }
@@ -65,6 +76,12 @@ interface CommitRow {
   sha: string;
   coauthor_trailer: string | null;
 }
+interface ExistingLinkRow {
+  id: string;
+  pr_id: string;
+  cc_session_id: string;
+  method: LinkMethod;
+}
 
 /** Accounting for one link run. */
 export interface LinkStats {
@@ -72,11 +89,26 @@ export interface LinkStats {
   linksWritten: number;
   prsMarked: number;
   sessionsMarked: number;
+  /** weak links dropped by the precision guard (select.ts). */
+  linksSuppressed: number;
+  /** previously-stored links removed because the fresh run no longer produces them. */
+  staleLinksRemoved: number;
+  /** window PRs un-marked (ai_assisted true → false) by reconciliation. */
+  prsUnmarked: number;
   errors: string[];
 }
 
 function emptyStats(): LinkStats {
-  return { prsConsidered: 0, linksWritten: 0, prsMarked: 0, sessionsMarked: 0, errors: [] };
+  return {
+    prsConsidered: 0,
+    linksWritten: 0,
+    prsMarked: 0,
+    sessionsMarked: 0,
+    linksSuppressed: 0,
+    staleLinksRemoved: 0,
+    prsUnmarked: 0,
+    errors: [],
+  };
 }
 
 /** A Claude co-author trailer marks AI authorship (case-insensitive contains). */
@@ -86,14 +118,21 @@ function isClaudeCoauthor(trailer: string | null): boolean {
   return t.includes('claude') || t.includes('anthropic');
 }
 
+/** Composite pair key. \x1f escape, never a raw control byte (repo gotcha). */
+function pairKey(prId: string, sessionRowId: string): string {
+  return `${prId}\x1f${sessionRowId}`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // linkAiToPr
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Compute + persist AI→PR links for one function over the trailing 28-day ingest
- * window. Idempotent (upsert on pr_id+cc_session_id). Never throws — errors are
- * collected into the returned stats so the pipeline continues.
+ * window. Idempotent AND self-healing: the fresh selection is authoritative for the
+ * window's PRs — links a previous (over-linking) run wrote that this run no longer
+ * produces are deleted, and gh_prs.ai_assisted / cc_sessions.linked_pr are
+ * reconciled to match. Never throws — errors are collected into the returned stats.
  */
 export async function linkAiToPr(functionId: string, now: Date = new Date()): Promise<LinkStats> {
   const stats = emptyStats();
@@ -120,13 +159,14 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
   }
   stats.prsConsidered = prs.length;
   if (prs.length === 0) return stats;
+  const prIds = prs.map((p) => p.id);
 
-  // 2. Candidate sessions for this function (branch/repo bound).
+  // 2. Candidate sessions for this function (Claude Code + Codex rows alike).
   let sessions: SessionRow[] = [];
   try {
     const { data, error } = await db
       .from('cc_sessions')
-      .select('id, repo, branch, pr_refs')
+      .select('id, session_id, repo, branch, linked_pr, pr_refs')
       .eq('function_id', functionId);
     if (error) {
       stats.errors.push(`cc_sessions read: ${error.message ?? 'unknown'}`);
@@ -140,7 +180,6 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
   if (sessions.length === 0) return stats;
 
   // 3. Co-author commits for these PRs (for the coauthor signal). Best-effort.
-  const prIds = prs.map((p) => p.id);
   const coauthorShasByPr = new Map<string, string[]>();
   try {
     const { data, error } = await db
@@ -160,45 +199,33 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
     // Co-author signal is optional; branch/sha still work without it.
   }
 
-  // Pre-derive, per session: its clean pr-link refs and the set of owner/repo slugs it
-  // is KNOWN to belong to (from those refs). The session's own `repo` column is a local
-  // FILESYSTEM PATH (e.g. /Users/.../prism), not an owner/repo slug, so it cannot be
-  // compared to gh_prs.repo directly — the pr-link refs are the reliable repo evidence.
-  interface SessionCand {
-    row: SessionRow;
-    prRefs: PrRef[];
-    knownRepos: Set<string>; // lower-cased owner/repo slugs from prRefs
-  }
-  const cands: SessionCand[] = sessions.map((s) => {
+  // 4. Canonicalize cwd-split duplicates (select.ts): ONE candidate per session_id,
+  //    pr_refs unioned, best branch wins. Only the canonical row emits links.
+  const lite: SessionRowLite[] = sessions.map((s) => {
     const prRefs: PrRef[] = [];
-    const knownRepos = new Set<string>();
     for (const r of s.pr_refs ?? []) {
       if (typeof r?.repo === 'string' && typeof r?.number === 'number' && Number.isFinite(r.number)) {
         prRefs.push({ repo: r.repo, number: r.number });
-        knownRepos.add(r.repo.trim().toLowerCase());
       }
     }
-    return { row: s, prRefs, knownRepos };
+    return { rowId: s.id, sessionId: s.session_id, branch: s.branch, prRefs };
   });
+  const canonicals = canonicalizeSessions(lite).map((c) => ({
+    ...c,
+    knownRepos: new Set(
+      c.prRefs
+        .map((r) => (typeof r.repo === 'string' ? r.repo.trim().toLowerCase() : ''))
+        .filter((r) => r.length > 0),
+    ),
+  }));
 
-  const linkRows: Array<{
-    function_id: string;
-    pr_id: string;
-    cc_session_id: string;
-    method: LinkMethod;
-    confidence: number;
-  }> = [];
-  const linkedPrIds = new Set<string>();
-  // sessionId → the pr_id to stamp on cc_sessions.linked_pr (first/highest link wins).
-  const sessionLinkedPr = new Map<string, string>();
-
-  // 4. Score every (PR, session) pair. Precision guard (HARD project rule): the
-  //    pr_link signal is self-scoped (it names its own repo+number, so it can only bind
-  //    to the right PR). The WEAKER branch/coauthor signals are NOT repo-aware on their
-  //    own, so we only expose them for a session that is KNOWN (via its pr-link refs) to
-  //    belong to THIS PR's repo. A session with no pr-link refs contributes pr_link=∅
-  //    and, lacking repo evidence, is not eligible for a branch/coauthor link either —
-  //    missing a link is acceptable; a wrong one is not.
+  // 5. Score every (PR, canonical session) pair. Precision guard (HARD project rule):
+  //    pr_link is self-scoped (it names its own repo+number). The WEAKER
+  //    branch/coauthor signals are NOT repo-aware on their own, so we only expose
+  //    them for a session KNOWN (via its pr-link refs) to belong to THIS PR's repo.
+  //    Codex sessions carry no pr_refs yet, so they are eligible for weak links only
+  //    once repo evidence exists — missing a link is acceptable; a wrong one is not.
+  const scored: ScoredLink[] = [];
   for (const pr of prs) {
     const prRepoNorm = (pr.repo ?? '').trim().toLowerCase();
     const prKeys: PrKeys = {
@@ -208,13 +235,11 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
       coauthorShas: coauthorShasByPr.get(pr.id) ?? [],
     };
     const prHasCoauthor = (coauthorShasByPr.get(pr.id)?.length ?? 0) > 0;
-    for (const c of cands) {
-      // Repo-scope the weak signals: only when this session is known to be in the PR's
-      // repo. pr_link ignores this (it self-scopes inside scoreMatch).
+    for (const c of canonicals) {
       const repoScoped = prRepoNorm.length > 0 && c.knownRepos.has(prRepoNorm);
       const sessionKeys: SessionKeys = {
         prRefs: c.prRefs,
-        branch: repoScoped ? c.row.branch : null,
+        branch: repoScoped ? c.branch : null,
         // The local-file session path has no commit SHAs; coauthor falls back to the
         // PR-side trailer presence. A SHA-bearing session (OTEL) would populate shas.
         shas: undefined,
@@ -222,62 +247,139 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
       };
       const match = scoreMatch(prKeys, sessionKeys);
       if (!match.method) continue;
-      linkRows.push({
-        function_id: functionId,
-        pr_id: pr.id,
-        cc_session_id: c.row.id,
+      scored.push({
+        prId: pr.id,
+        sessionRowId: c.rowId,
         method: match.method,
         confidence: match.confidence,
       });
-      linkedPrIds.add(pr.id);
-      if (!sessionLinkedPr.has(c.row.id)) sessionLinkedPr.set(c.row.id, pr.id);
     }
   }
 
-  if (linkRows.length === 0) return stats;
+  // 6. Weak-link suppression (select.ts): a PR covered by an exact identity link
+  //    (pr_link/sha) keeps no coauthor fallbacks — the over-linking fix.
+  const { kept, suppressed } = selectLinks(scored);
+  stats.linksSuppressed = suppressed.length;
 
-  // 5. Upsert pr_ai_link (idempotent on pr_id+cc_session_id).
+  const linkedPrIds = new Set(kept.map((l) => l.prId));
+  // kept is strongest-first, so the first PR seen per session is its best link.
+  const sessionLinkedPr = new Map<string, string>();
+  for (const l of kept) {
+    if (!sessionLinkedPr.has(l.sessionRowId)) sessionLinkedPr.set(l.sessionRowId, l.prId);
+  }
+
+  // 7. RECONCILE stored links for the window's PRs against the fresh selection.
+  //    Stale rows (pair no longer produced, or method changed) are deleted — this is
+  //    what retro-fixes the earlier cartesian coauthor links.
   try {
-    const { error } = await db
+    const { data, error } = await db
       .from('pr_ai_link')
-      .upsert(linkRows, { onConflict: 'pr_id,cc_session_id' });
+      .select('id, pr_id, cc_session_id, method')
+      .eq('function_id', functionId)
+      .in('pr_id', prIds);
     if (error) {
-      stats.errors.push(`pr_ai_link upsert: ${error.message ?? 'unknown'}`);
+      stats.errors.push(`pr_ai_link read: ${error.message ?? 'unknown'}`);
+    } else {
+      const freshMethod = new Map(kept.map((l) => [pairKey(l.prId, l.sessionRowId), l.method]));
+      const staleIds = (Array.isArray(data) ? (data as ExistingLinkRow[]) : [])
+        .filter((row) => freshMethod.get(pairKey(row.pr_id, row.cc_session_id)) !== row.method)
+        .map((row) => row.id);
+      if (staleIds.length > 0) {
+        const { error: delError } = await db.from('pr_ai_link').delete().in('id', staleIds);
+        if (delError) stats.errors.push(`pr_ai_link delete: ${delError.message ?? 'unknown'}`);
+        else stats.staleLinksRemoved = staleIds.length;
+      }
+    }
+  } catch (e) {
+    stats.errors.push(`pr_ai_link reconcile: ${e instanceof Error ? e.message : 'unknown'}`);
+  }
+
+  // 8. Upsert the fresh links (idempotent on pr_id+cc_session_id).
+  if (kept.length > 0) {
+    const linkRows = kept.map((l) => ({
+      function_id: functionId,
+      pr_id: l.prId,
+      cc_session_id: l.sessionRowId,
+      method: l.method,
+      confidence: l.confidence,
+    }));
+    try {
+      const { error } = await db
+        .from('pr_ai_link')
+        .upsert(linkRows, { onConflict: 'pr_id,cc_session_id' });
+      if (error) {
+        stats.errors.push(`pr_ai_link upsert: ${error.message ?? 'unknown'}`);
+        return stats;
+      }
+      stats.linksWritten = linkRows.length;
+    } catch (e) {
+      stats.errors.push(`pr_ai_link upsert: ${e instanceof Error ? e.message : 'unknown'}`);
       return stats;
     }
-    stats.linksWritten = linkRows.length;
-  } catch (e) {
-    stats.errors.push(`pr_ai_link upsert: ${e instanceof Error ? e.message : 'unknown'}`);
-    return stats;
   }
 
-  // 6. Flag linked PRs as ai_assisted.
-  try {
-    const { error } = await db
-      .from('gh_prs')
-      .update({ ai_assisted: true })
-      .in('id', [...linkedPrIds]);
-    if (error) stats.errors.push(`gh_prs ai_assisted: ${error.message ?? 'unknown'}`);
-    else stats.prsMarked = linkedPrIds.size;
-  } catch (e) {
-    stats.errors.push(`gh_prs ai_assisted: ${e instanceof Error ? e.message : 'unknown'}`);
+  // 9. Reconcile gh_prs.ai_assisted for the window: true where linked, false where
+  //    a previous run marked a PR that no longer links (ai_assisted is written only
+  //    by this step, so the unmark is safe).
+  if (linkedPrIds.size > 0) {
+    try {
+      const { error } = await db
+        .from('gh_prs')
+        .update({ ai_assisted: true })
+        .in('id', [...linkedPrIds]);
+      if (error) stats.errors.push(`gh_prs ai_assisted: ${error.message ?? 'unknown'}`);
+      else stats.prsMarked = linkedPrIds.size;
+    } catch (e) {
+      stats.errors.push(`gh_prs ai_assisted: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
+  }
+  const unlinkedPrIds = prIds.filter((id) => !linkedPrIds.has(id));
+  if (unlinkedPrIds.length > 0) {
+    try {
+      const { error } = await db
+        .from('gh_prs')
+        .update({ ai_assisted: false })
+        .in('id', unlinkedPrIds)
+        .eq('ai_assisted', true);
+      if (error) stats.errors.push(`gh_prs unmark: ${error.message ?? 'unknown'}`);
+      else stats.prsUnmarked = unlinkedPrIds.length;
+    } catch (e) {
+      stats.errors.push(`gh_prs unmark: ${e instanceof Error ? e.message : 'unknown'}`);
+    }
   }
 
-  // 7. Stamp cc_sessions.linked_pr for each linked session.
+  // 10. Stamp cc_sessions.linked_pr on linked canonical rows; clear stale stamps on
+  //     window-PR-pointing rows (incl. cwd-split duplicates) that no longer link.
   let sessionsMarked = 0;
-  for (const [sessionId, prId] of sessionLinkedPr) {
+  for (const [sessionRowId, prId] of sessionLinkedPr) {
     try {
       const { error } = await db
         .from('cc_sessions')
         .update({ linked_pr: prId })
-        .eq('id', sessionId);
-      if (error) stats.errors.push(`cc_sessions linked_pr (${sessionId}): ${error.message ?? 'unknown'}`);
+        .eq('id', sessionRowId);
+      if (error) stats.errors.push(`cc_sessions linked_pr (${sessionRowId}): ${error.message ?? 'unknown'}`);
       else sessionsMarked += 1;
     } catch (e) {
-      stats.errors.push(`cc_sessions linked_pr (${sessionId}): ${e instanceof Error ? e.message : 'unknown'}`);
+      stats.errors.push(`cc_sessions linked_pr (${sessionRowId}): ${e instanceof Error ? e.message : 'unknown'}`);
     }
   }
   stats.sessionsMarked = sessionsMarked;
+
+  const windowPrIdSet = new Set(prIds);
+  const staleStamped = sessions.filter(
+    (s) =>
+      !sessionLinkedPr.has(s.id) && // rows just (re)stamped above are never cleared
+      s.linked_pr !== null &&
+      windowPrIdSet.has(s.linked_pr),
+  );
+  for (const s of staleStamped) {
+    try {
+      const { error } = await db.from('cc_sessions').update({ linked_pr: null }).eq('id', s.id);
+      if (error) stats.errors.push(`cc_sessions unstamp (${s.id}): ${error.message ?? 'unknown'}`);
+    } catch (e) {
+      stats.errors.push(`cc_sessions unstamp (${s.id}): ${e instanceof Error ? e.message : 'unknown'}`);
+    }
+  }
 
   return stats;
 }
