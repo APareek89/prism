@@ -84,6 +84,45 @@ in `lib/scoring` has been changed for v3.0. Do NOT partially implement; when the
 
 **Phase-2 spec** (org scaling: function packs · org rollup · manager index · onboarding) → `docs/phase-2.md` — aligned 2026-07-02, not implemented.
 
+**Product roadmap (2026-07-06, v1.1 DRAFT — awaiting owner ratification):** 1-year roadmap
+(Aug 2026 → Jul 2027), one feature/month with a full PRD each, at **`docs/prd/`**
+(`README.md` = the roadmap + index). **v1.1 = hybrid re-cut after an investor-perspective
+review** (owner-approved in-session): run-cost pulled forward as the market wedge — M2 (Sep) =
+2a stage ① bill visibility, M6 (Jan) = stage ② gateway-tag attribution, M12 (Jul) = **AI P&L
+v1** (2a unit economics + 2b seats + the training-vs-procurement join). Workforce spine kept:
+M1 Core-6 v3.0 (incl. over-linking fix) → M3 Harness → M4 linkage → M5 prod multi-user →
+M7 telemetry → M8 onboarding → M9 org rollup → M10 reliability T1 → M11 coaching plugin.
+**Manager Enablement Index + DevOps pack → `docs/prd/backlog/`** (deferred, reconsider
+triggers documented). Positioning now leads with cost ("where AI money goes"), workforce
+indexes explain the why. The roadmap still only sequences ratified decisions
+(scoring-model v3.0 + phase-2) — nothing in it changes the model.
+
+**Operating principle (2026-07-06, strategy-review arc — decided in-chat, no separate doc):**
+- **Irreversible asset = the cross-org intervention-outcome corpus** ("verified deltas":
+  recommendation → customer action → outcome verified from data). The evidence graph is the
+  substrate (customer-owned → retention); the corpus is the company asset (interventional,
+  cannot be backfilled or derived from observational data, compounds with trust × time).
+- **North-star metric: verified deltas per month.** Decision rule for any feature, connector,
+  customer ask, or partnership: does it raise the accumulation rate (more partner orgs ×
+  higher rec-adoption × shorter verification windows × better evidence quality)? If no,
+  it needs a strong justification.
+- Sequencing corollary: shortest verification windows build the corpus fastest — run-cost
+  actions verify against the next bill (~30d) vs practice interventions (~a quarter), so the
+  v1.1 cost-forward re-cut is corpus-optimal as well as wedge-optimal.
+- **Day zero of the corpus = first verified delta at a non-dogfood org.** Five design
+  partners precede everything; the accumulation rate is currently ~zero and that is the
+  company's real bottleneck (not model fidelity).
+- **Owner override (2026-07-06): support Codex in Month 1** — ingest local Codex session
+  logs as a parser variant on the claude-code rails (`source` tag on sessions; link falls
+  back to branch/sha/coauthor since no `pr-link` event → lower confidence, shown honestly).
+  Cursor/Copilot stay gated on the design partners' tool mix (Month 4). Not yet built.
+- **Full strategy record → `docs/strategy/` (README = map + reading order).** Governance:
+  `operating-principle.md` (every decision) > `next-6-months.md` (sequencing, kill criteria —
+  GOVERNS; the prd/ roadmap is now the build library) > `design-partner-outreach.md` (live
+  action: 20 CTOs → 5 partners, note included). Reference: `ic-review-2026-07.md` (pass-with-
+  re-entry verdict), `inevitability-2026-07.md` (why-now + 10 answers), `awp-protocol-sketch.md`
+  + `awp-events-v0.md` (protocol thread, hard-capped at ~5% effort until customer #5).
+
 ## Next session — paste-ready prompt (for the owner)
 ```
 Continue the Prism project at /Users/anandpareek/Documents/prism.
