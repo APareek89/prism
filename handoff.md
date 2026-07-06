@@ -112,6 +112,10 @@ indexes explain the why. The roadmap still only sequences ratified decisions
 - **Day zero of the corpus = first verified delta at a non-dogfood org.** Five design
   partners precede everything; the accumulation rate is currently ~zero and that is the
   company's real bottleneck (not model fidelity).
+- **Owner override (2026-07-06): support Codex in Month 1** — ingest local Codex session
+  logs as a parser variant on the claude-code rails (`source` tag on sessions; link falls
+  back to branch/sha/coauthor since no `pr-link` event → lower confidence, shown honestly).
+  Cursor/Copilot stay gated on the design partners' tool mix (Month 4). Not yet built.
 - **Full strategy record → `docs/strategy/` (README = map + reading order).** Governance:
   `operating-principle.md` (every decision) > `next-6-months.md` (sequencing, kill criteria —
   GOVERNS; the prd/ roadmap is now the build library) > `design-partner-outreach.md` (live
