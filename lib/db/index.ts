@@ -48,3 +48,6 @@ export {
 
 // Admin reads.
 export { getConnectors, getRosterMatches, getIndexConfig, getSizingRule } from './admin';
+
+// ROI statement v0 (function-scope, print-friendly).
+export { getStatement } from './statement';

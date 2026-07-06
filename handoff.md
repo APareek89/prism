@@ -157,6 +157,30 @@ current state in 5 lines and wait for my instruction.
   Pre-existing keyless-build gap found: `/admin` prerender fails with NO `.env.local`
   (violates ownership-map invariant; spawned as separate task).
 
+**Session 2026-07-06 — Month-1 build, part 2 (ROI statement v0 + worktree env hook):**
+- **ROI statement v0 shipped** (spec: `docs/prd/2026-08-roi-statement-v0.md`): new
+  `/statement` route (`app/(views)/statement/page.tsx`) — one print-friendly page, the
+  three load-bearing numbers over the trailing 28d, each with an evidence badge + a
+  same-page drill-down (excluded from print). No bands/index/L-levels/USD. Pure derive
+  layer `lib/db/statement-derive.ts` (+ 19 fixture tests) behind `lib/db/statement.ts`
+  `getStatement(functionId, date)`; DTOs added to `lib/ui/view-models.ts`; barrel
+  export in `lib/db/index.ts`; `.stmt-*` + `@media print` in `app/globals.css`.
+  Verified on real dogfood data (fn "My Engineering"): share **100%** (10/10, badge "10
+  first-party (0.99)"), held-up **AI 0% / human awaiting-signal** (0 reverts), **655.3k
+  tokens/AI PR**, 58.5M unattributed. Live column probe + typecheck + 273 tests + build
+  all green.
+- **Gotcha (dates):** dogfood PRs actually merged **2026-07-01 UTC**; a `merged_at::date`
+  read via node-pg *looked* like 06-30 — that's a node-pg local-TZ (IST +05:30) `Date`
+  parsing artifact, not the stored value. Statement dates normalize to UTC
+  (`new Date(iso).toISOString()`) so labels + window bounds are tz-independent (matches
+  `lib/scoring/window.ts`); regression test locks it in.
+- **Worktree env hook:** `scripts/copy-env.sh` + `.claude/settings.json` SessionStart
+  hook copy the main repo's gitignored `.env.local` into a fresh worktree (idempotent,
+  no-clobber, no-op in main). Fixes new worktrees starting without env (which blocks
+  `npm run dev` + the column-truth check). Only helps FUTURE worktrees once it lands on
+  the branch they're based on (`.claude/launch.json` is tracked, so a committed
+  `.claude/settings.json` propagates).
+
 **Still open (follow-ups, no code yet):**
 1. ~~Over-linking~~ — **RESOLVED 2026-07-06** (see session block above).
 2. **`ai_code_retention_30d` premature 0** — freshly-merged AI lines (<30d, not re-checked) score 0 instead
