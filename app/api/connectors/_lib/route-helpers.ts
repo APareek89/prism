@@ -15,6 +15,11 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { appTable } from '@/lib/supabase/server';
 import { isConfigured } from '@/lib/config/env';
+import { isDemoMode } from '@/lib/config/flags';
+import { getAuthUser } from '@/lib/auth/session';
+
+/** The synthetic demo functionId that is NOT a real row (session.ts DEMO_USER). */
+const DEMO_FUNCTION_PLACEHOLDER = 'demo-function';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // JSON responses
@@ -50,20 +55,29 @@ export function notConfigured(detail: string): Response {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Resolve the REAL bootstrap function id the connectors should write to. Today there is
- * exactly one `functions` row (org = me = team); we read it via the service-role client
- * so the answer is the live uuid, not the demo placeholder. Returns null only when
- * Supabase is unconfigured or the table is empty.
+ * Resolve the function id an admin's connector/ingest/pipeline action should target.
+ *
+ * MULTI-TENANT: this is the CALLER's own org function — resolved from the authenticated
+ * employee (getAuthUser().functionId), never "the first function" (which would misroute
+ * one org's writes into another). These routes are admin-gated, so the caller is an admin
+ * of their org. Only the single-tenant DEMO (placeholder / keyless) falls back to the one
+ * function. Returns null when Supabase is unconfigured or no function can be resolved.
  */
 export async function resolveBootstrapFunctionId(): Promise<string | null> {
   if (!isConfigured('supabase')) return null;
-  try {
-    const db = appTable(createAdminClient());
-    const { data } = await db.from('functions').select('id').limit(1).maybeSingle();
-    return (data?.id as string | undefined) ?? null;
-  } catch {
-    return null;
+  const user = await getAuthUser();
+  const fid = user?.functionId;
+  if (fid && fid !== DEMO_FUNCTION_PLACEHOLDER) return fid;
+  if (isDemoMode()) {
+    try {
+      const db = appTable(createAdminClient());
+      const { data } = await db.from('functions').select('id').limit(1).maybeSingle();
+      return (data?.id as string | undefined) ?? fid ?? null;
+    } catch {
+      return fid ?? null;
+    }
   }
+  return null;
 }
 
 /** Read a JSON body safely; returns null on empty/invalid bodies (callers 400). */

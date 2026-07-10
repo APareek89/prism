@@ -122,11 +122,18 @@ export { getAuthUser };
  */
 export async function getCurrentFunctionId(): Promise<string | null> {
   const user = await getAuthUser();
-  if (user?.functionId) return user.functionId;
-
-  const client = await db();
-  const fn = await selectOne(() => client.from('functions').select('id').limit(1).maybeSingle());
-  return (fn?.id as string | undefined) ?? null;
+  const fid = user?.functionId;
+  // MULTI-TENANT: a view resolves the signed-in user's OWN org function, never "the
+  // first function" (that would show one org another org's data). 'demo-function' is the
+  // synthetic placeholder (session.ts); only the single-tenant demo falls back to the one
+  // function row.
+  if (fid && fid !== 'demo-function') return fid;
+  if (isDemoMode()) {
+    const client = await db();
+    const fn = await selectOne(() => client.from('functions').select('id').limit(1).maybeSingle());
+    return (fn?.id as string | undefined) ?? fid ?? null;
+  }
+  return null;
 }
 
 /** The current employee's id, or null when unauthenticated. */
