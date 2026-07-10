@@ -21,6 +21,7 @@ import type { AttributionMode } from '@/lib/types/db';
 
 interface LooseResult extends Promise<{ data: unknown; error: { message?: string } | null }> {
   eq: (col: string, val: unknown) => LooseResult;
+  is: (col: string, val: unknown) => LooseResult;
   or: (filter: string) => LooseResult;
   select: (cols?: string) => LooseResult;
   limit: (n: number) => LooseResult;
@@ -123,6 +124,26 @@ export async function findByUserId(uid: string): Promise<EmployeeRecord | null> 
       .from('employees')
       .select(EMPLOYEE_COLS)
       .eq('user_id', uid)
+      .maybeSingle();
+    return error ? null : asEmployee(data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Find a PENDING invited seat by email across ALL orgs (an admin-created employee row
+ * with no `user_id` yet). This is how a self-registering member is routed to the org
+ * that invited them — email is the join key, org-agnostic. Returns null if none.
+ */
+export async function findPendingInviteByEmail(email: string): Promise<EmployeeRecord | null> {
+  try {
+    const { data, error } = await admin()
+      .from('employees')
+      .select(EMPLOYEE_COLS)
+      .eq('email', email)
+      .is('user_id', null)
+      .limit(1)
       .maybeSingle();
     return error ? null : asEmployee(data);
   } catch {

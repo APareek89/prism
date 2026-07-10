@@ -1,54 +1,32 @@
 // lib/auth/link.ts
 //
-// First-login identity bridge: bind a Supabase auth user (auth.uid + email) to an
-// `employees` row so RLS can scope their data and the pipeline can attribute their
-// sessions. Runs via the SERVICE-ROLE client (the RLS-scoped session can't set its own
-// user_id on a pre-existing roster row).
+// First-login identity bridge (multi-tenant). Binds a Supabase auth user (auth.uid) to
+// an `employees` row so RLS can scope their data. Runs via the service-role client (the
+// RLS-scoped session can't set its own user_id on a pre-existing invited seat).
 //
 // Resolution, in order:
 //   1. already linked (employees.user_id = uid) → return it.
-//   2. a roster row matches the login email → set its user_id (claim the seat).
-//   3. no match → provision a fresh employee in the bootstrap function, linked to uid.
+//   2. a PENDING invited seat matches the login email (in ANY org) → claim it (set
+//      user_id) → the member joins that org.
+//   3. no match → null. There is NO "provision into a bootstrap function" fallback:
+//      creating a brand-new org is the signup server action's job (lib/auth/signup),
+//      not a silent side effect of resolving a session.
 //
-// Idempotent: safe to call on every authenticated resolve. Never throws (auth must not
-// 500 on a linking hiccup) — returns null and the caller falls back to unauthenticated.
+// Never throws (auth must not 500 on a linking hiccup) — returns null and the caller
+// falls back to unauthenticated.
 
-import { createAdminClient } from '@/lib/supabase/admin';
 import {
   findByUserId,
-  findByEmail,
+  findPendingInviteByEmail,
   updateEmployee,
-  insertEmployee,
   type EmployeeRecord,
 } from '@/lib/db/onboarding';
 
-/** The single bootstrap function id (service-role read; org = me = team today). */
-async function bootstrapFunctionId(): Promise<string | null> {
-  try {
-    const admin = createAdminClient() as unknown as {
-      from: (t: string) => {
-        select: (c: string) => {
-          limit: (n: number) => { maybeSingle: () => Promise<{ data: { id?: string } | null }> };
-        };
-      };
-    };
-    const { data } = await admin.from('functions').select('id').limit(1).maybeSingle();
-    return data?.id ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** A display name derived from an email local-part (fallback when no roster name). */
-function nameFromEmail(email: string | null): string {
-  if (!email) return 'New member';
-  const local = email.split('@')[0] ?? email;
-  return local.replace(/[._-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'New member';
-}
-
 /**
- * Bind `uid`/`email` to an employee, provisioning one if needed. Returns the linked
- * EmployeeRecord (user_id === uid) or null when it can't (no function / write failure).
+ * Bind `uid`/`email` to an existing employee (already linked, or an invited seat claimed
+ * by email). Returns the EmployeeRecord (user_id === uid) or null when there is nothing
+ * to bind to (no prior link, no pending invite) — the caller then treats the session as
+ * org-less until org signup / an invite exists.
  */
 export async function linkOrProvisionUser(
   uid: string,
@@ -58,28 +36,12 @@ export async function linkOrProvisionUser(
   const linked = await findByUserId(uid);
   if (linked) return linked;
 
-  const functionId = await bootstrapFunctionId();
-  if (!functionId) return null;
-
-  // 2. Claim a roster seat by email (a person pre-added but not yet logged in).
+  // 2. Claim a pending invited seat by email (routes the member to the inviting org).
   if (email) {
-    const byEmail = await findByEmail(functionId, email);
-    if (byEmail && !byEmail.user_id) {
-      return updateEmployee(byEmail.id, { user_id: uid, active: true });
-    }
-    if (byEmail && byEmail.user_id === uid) return byEmail;
+    const invite = await findPendingInviteByEmail(email);
+    if (invite) return updateEmployee(invite.id, { user_id: uid, active: true });
   }
 
-  // 3. Provision a fresh employee bound to this user. Attribution stays 'unmatched'
-  //    until a github_handle / claude_account_uuid links their delivery + sessions.
-  return insertEmployee({
-    function_id: functionId,
-    user_id: uid,
-    name: nameFromEmail(email),
-    email,
-    attribution_mode: 'unmatched',
-    match_status: 'unmatched',
-    active: true,
-    is_demo: false,
-  });
+  // 3. No link, no invite → org-less; org creation is the signup action's job.
+  return null;
 }

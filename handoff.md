@@ -213,6 +213,26 @@ current state in 5 lines and wait for my instruction.
   invite-by-email + member self-register + an `organizations` tenant model), then implement. M8's
   hard dep (M5 auth+RLS) is met by this Phase 1; M7 is a soft (value) dep.
 
+**Session (M8 v2) — TRUE MULTI-TENANT onboarding (W1+W2, on the isolated dev DB):**
+- **Tenant model (migration 0036):** `organizations` = tenant root; `functions.org_id` (one
+  function per org in v1, 1:many-ready); `current_org_id()` SECURITY DEFINER helper;
+  organizations RLS = members read only their own org. Existing function backfilled into an org.
+- **Org-scoped resolver:** `resolveBootstrapFunctionId` (11 admin routes) + `getCurrentFunctionId`
+  (views) resolve the CALLER's org function — no first-row fallback (demo fallback kept).
+- **Org signup + invite→join:** `lib/onboarding/org.ts createOrganization` (org+function+admin
+  employee+admin role); `lib/auth/signup.ts signUpAction` (invited email → join that org via
+  `findPendingInviteByEmail`; else org name → create a tenant; via service-role `admin.createUser`,
+  v1 permissive — duplicate/fake orgs deferred per owner decision 2026-07-11); `linkOrProvisionUser`
+  now multi-tenant (claim an invited seat by email; no bootstrap auto-provision); SignInForm has a
+  create-account / org-name mode.
+- **Verified with the REAL code** (node-env integration test `lib/auth/onboarding-mt.test.ts`,
+  `describe.skipIf` without DB): org signup, invite→join, and **cross-tenant isolation** (org A
+  can't see org B; anon sees none). 285 unit tests + build green. (Gotcha: integration tests that
+  build the service-role client must set `// @vitest-environment node` — jsdom's `window` trips the
+  server-only guard.)
+- **NEXT (W3):** admin invite-by-email UI/route (reuse `provisionEmployee`) + an org-admin
+  employees read policy — employees RLS is self-only today, so an admin can't yet list their roster.
+
 **Still open (follow-ups, no code yet):**
 1. ~~Over-linking~~ — **RESOLVED 2026-07-06** (see session block above).
 2. **`ai_code_retention_30d` premature 0** — freshly-merged AI lines (<30d, not re-checked) score 0 instead
