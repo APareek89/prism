@@ -22,6 +22,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { AdminConnectors } from '@/components/admin/AdminConnectors';
 import { AttributionSelector } from '@/components/admin/AttributionSelector';
 import { RosterUpload } from '@/components/admin/RosterUpload';
+import { MembersPanel } from '@/components/admin/MembersPanel';
 import { IndexConfig } from '@/components/admin/IndexConfig';
 import { SizingRule } from '@/components/admin/SizingRule';
 import { getAuthUser } from '@/lib/auth/session';
@@ -92,7 +93,12 @@ export default async function AdminPage() {
           <AttributionSelector />
         </section>
 
-        {/* ── roster — upload + match table ── */}
+        {/* ── members — invite by email (self-serve) ── */}
+        <section id="members">
+          <MembersPanel />
+        </section>
+
+        {/* ── roster — CSV upload + match table ── */}
         <section id="roster">
           <div className="card" style={{ marginBottom: 18 }}>
             <div className="cardhead">

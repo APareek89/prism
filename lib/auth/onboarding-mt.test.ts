@@ -45,6 +45,26 @@ async function token(email: string, password: string): Promise<string | null> {
   const { data } = await anon().auth.signInWithPassword({ email, password });
   return data.session?.access_token ?? null;
 }
+async function sessionFor(email: string, password: string) {
+  const { data } = await anon().auth.signInWithPassword({ email, password });
+  return data.session;
+}
+function emailsSeenBy(tok: string) {
+  return createClient(URL, ANON, { global: { headers: { Authorization: `Bearer ${tok}` } }, auth: { persistSession: false } })
+    .from('employees').select('email')
+    .then(({ data }: { data: { email: string }[] | null }) => (data ?? []).map((r) => r.email).sort());
+}
+// Mint the @supabase/ssr session cookie so we can call authed API routes on the dev server.
+const REF = (URL.match(/https:\/\/([a-z0-9]+)\./)?.[1]) ?? '';
+function cookieHeader(session: unknown): string {
+  const n = `sb-${REF}-auth-token`;
+  const v = 'base64-' + Buffer.from(JSON.stringify(session)).toString('base64');
+  const C = 3180;
+  if (v.length <= C) return `${n}=${v}`;
+  const parts: string[] = [];
+  for (let i = 0, x = 0; i < v.length; i += C, x++) parts.push(`${n}.${x}=${v.slice(i, i + C)}`);
+  return parts.join('; ');
+}
 async function orgsVisible(tok: string | null): Promise<string[]> {
   const c = createClient(URL, ANON, tok
     ? { global: { headers: { Authorization: `Bearer ${tok}` } }, auth: { persistSession: false } }
@@ -86,6 +106,30 @@ describe.skipIf(!process.env.SUPABASE_DB_URL)('multi-tenant onboarding (M8 v2)',
     expect(await orgsVisible(acme)).toEqual(['Acme Inc']);
     expect(await orgsVisible(dev)).toEqual(['My Engineering']);
     expect(await orgsVisible(null)).toEqual([]);
+  });
+
+  it('W3: admin reads the org roster (RLS) + invites via the API; devs stay self-only', async () => {
+    // RLS admin-read policy: the Acme admin sees the whole Acme roster, never another org.
+    const acmeTok = (await token(ADMIN, ADMIN_PW))!;
+    const acmeEmails = await emailsSeenBy(acmeTok);
+    expect(acmeEmails).toContain(ADMIN);
+    expect(acmeEmails).toContain(MEMBER); // admin sees the invited member too
+    expect(acmeEmails).not.toContain('dev-a@prism.local'); // cross-tenant: not My Engineering
+
+    // a plain developer still sees only their own row (self policy).
+    const devEmails = await emailsSeenBy((await token('dev-a@prism.local', 'prism-dev-A1'))!);
+    expect(devEmails).toEqual(['dev-a@prism.local']);
+
+    // the real /api/org/members route via the admin's session cookie (end-to-end).
+    const cookie = cookieHeader(await sessionFor(ADMIN, ADMIN_PW));
+    const g = await (await fetch('http://localhost:3000/api/org/members', { headers: { cookie } })).json();
+    expect(g.ok).toBe(true);
+    expect(g.members.map((m: { email: string }) => m.email)).toContain(MEMBER);
+    const p = await (await fetch('http://localhost:3000/api/org/members', {
+      method: 'POST', headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({ emails: ['newhire@acme.test'] }),
+    })).json();
+    expect(p).toMatchObject({ ok: true, added: 1 });
   });
 
   afterAll(async () => {
