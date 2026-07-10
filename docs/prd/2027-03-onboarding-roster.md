@@ -91,6 +91,7 @@
 
 ## Open questions
 
+- **Duplicate / fake org accounts**: v1 org signup is permissive — no dedup, no domain/email verification, so duplicate or fake orgs are possible. **Owner decision (2026-07-11): accept for v1, defer to a later stronger-security pass** (verified invite emails, org verification/dedup, abuse guards). The schema is designed verification-ready (`organizations.status`, `organizations.created_by`) so hardening is additive, not a rewrite.
 - Email confirmation: v1 uses server-side `admin.createUser` (confirmed) so signup works without SMTP — but that skips email-ownership proof. When do we add real verified invite emails? (CPO proposal: immediate follow-up; gate member signup on a per-invite token in the meantime.)
 - Supabase rejects some email domains as "invalid" (observed with `@prism.local`) and the project's "Confirm email" toggle state is unset — confirm the real signup path against deliverable domains in W1.
 - Invite token vs open email-match: should member signup require a per-invite token (link), or just match a pending seat by email? (Open-match is simpler but weaker; token is safer.)
