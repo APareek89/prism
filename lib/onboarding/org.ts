@@ -22,6 +22,7 @@ export interface CreateOrgResult {
   ok: boolean;
   orgId?: string;
   functionId?: string;
+  ingestToken?: string;
   employee?: EmployeeRecord;
   error?: string;
 }
@@ -29,7 +30,7 @@ export interface CreateOrgResult {
 interface LooseAdmin {
   from: (t: string) => {
     insert: (rows: unknown) => {
-      select: (cols: string) => { single: () => Promise<{ data: { id?: string } | null; error: { message?: string } | null }> };
+      select: (cols: string) => { single: () => Promise<{ data: { id?: string; ingest_token?: string } | null; error: { message?: string } | null }> };
     };
   };
 }
@@ -46,12 +47,13 @@ export async function createOrganization(args: {
   adminName?: string;
 }): Promise<CreateOrgResult> {
   const admin = createAdminClient() as unknown as LooseAdmin;
+  const ingestToken = `pi_${randomUUID().replace(/-/g, '')}`;
 
-  // 1. organizations
+  // 1. organizations (with a per-org ingest token for the plugin/telemetry endpoints)
   const org = await admin
     .from('organizations')
-    .insert({ name: args.name, slug: slugify(args.name), created_by: args.adminUserId, status: 'active' })
-    .select('id')
+    .insert({ name: args.name, slug: slugify(args.name), created_by: args.adminUserId, status: 'active', ingest_token: ingestToken })
+    .select('id, ingest_token')
     .single();
   if (org.error || !org.data?.id) return { ok: false, error: org.error?.message ?? 'org insert failed' };
   const orgId = org.data.id;
@@ -86,5 +88,5 @@ export async function createOrganization(args: {
     .single();
   if (role.error) return { ok: false, error: role.error.message ?? 'admin role grant failed' };
 
-  return { ok: true, orgId, functionId, employee };
+  return { ok: true, orgId, functionId, ingestToken: org.data.ingest_token ?? ingestToken, employee };
 }

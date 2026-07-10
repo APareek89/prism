@@ -14,15 +14,13 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { appTable } from '@/lib/supabase/server';
-import { isConfigured, serverEnv } from '@/lib/config/env';
 import { parsePrLinkPayload } from '@/lib/ingest/pr-link';
 import {
   ok,
   badRequest,
   serverError,
-  notConfigured,
   readJson,
-  resolveBootstrapFunctionId,
+  resolveIngestFunctionId,
   errMessage,
 } from '@/app/api/connectors/_lib/route-helpers';
 
@@ -43,13 +41,12 @@ function bearer(req: Request): string | null {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  // 1. Auth. No token configured ⇒ the endpoint is off (never trusts an unauthed post).
-  const expected = serverEnv.PRISM_INGEST_TOKEN;
-  if (!expected) return notConfigured('PRISM_INGEST_TOKEN not set — ingest endpoint disabled');
+  // 1. Auth + tenant: the bearer token both authenticates AND selects the org (FR-18) —
+  //    a per-org ingest_token, or the global PRISM_INGEST_TOKEN (demo / single-tenant).
   const presented = bearer(req);
-  if (!presented || presented !== expected) {
-    return unauthorized('invalid or missing bearer token');
-  }
+  if (!presented) return unauthorized('missing bearer token');
+  const functionId = await resolveIngestFunctionId(presented);
+  if (!functionId) return unauthorized('invalid ingest token');
 
   // 2. Parse + validate (metadata-only; any extra fields are dropped by the parser).
   const body = await readJson(req);
@@ -57,11 +54,6 @@ export async function POST(req: Request): Promise<Response> {
   const parsed = parsePrLinkPayload(body);
   if (!parsed.ok) return badRequest(parsed.error);
   const ev = parsed.value;
-
-  // 3. Resolve the function this evidence belongs to.
-  if (!isConfigured('supabase')) return notConfigured('supabase not configured');
-  const functionId = await resolveBootstrapFunctionId();
-  if (!functionId) return notConfigured('no function to attribute the pr-link to');
 
   // 4. Idempotent upsert (service-role). Redelivery on the unique key is a no-op.
   try {

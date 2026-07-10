@@ -14,7 +14,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { appTable } from '@/lib/supabase/server';
-import { isConfigured } from '@/lib/config/env';
+import { isConfigured, serverEnv } from '@/lib/config/env';
 import { isDemoMode } from '@/lib/config/flags';
 import { getAuthUser } from '@/lib/auth/session';
 
@@ -78,6 +78,33 @@ export async function resolveBootstrapFunctionId(): Promise<string | null> {
     }
   }
   return null;
+}
+
+/**
+ * Resolve the function a TOKEN-authenticated ingest (plugin / telemetry) should write to.
+ * The bearer token both authenticates AND selects the tenant (FR-18):
+ *   1. a per-org `organizations.ingest_token` → that org's function.
+ *   2. the global `PRISM_INGEST_TOKEN` → the bootstrap function (demo / single-tenant).
+ * Returns null when the token matches nothing (the route then 401s). Never throws.
+ */
+export async function resolveIngestFunctionId(token: string | null): Promise<string | null> {
+  if (!token || !isConfigured('supabase')) return null;
+  try {
+    const db = appTable(createAdminClient());
+    const org = await db.from('organizations').select('id').eq('ingest_token', token).maybeSingle();
+    const orgId = (org as { data?: { id?: string } | null }).data?.id;
+    if (orgId) {
+      const fn = await db.from('functions').select('id').eq('org_id', orgId).limit(1).maybeSingle();
+      const fid = (fn as { data?: { id?: string } | null }).data?.id;
+      if (fid) return fid;
+    }
+    if (serverEnv.PRISM_INGEST_TOKEN && token === serverEnv.PRISM_INGEST_TOKEN) {
+      return resolveBootstrapFunctionId();
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /** Read a JSON body safely; returns null on empty/invalid bodies (callers 400). */
