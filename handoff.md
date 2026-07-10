@@ -199,6 +199,20 @@ current state in 5 lines and wait for my instruction.
   as a `pr_link`@0.99 source alongside `cc_sessions.pr_refs`. The OTLP receiver route is a
   separate, later piece (do not point telemetry at the pr-link endpoint).
 
+**Session (Phase 1) — multiple logins + sign-in page fix (on the isolated dev DB):**
+- **Multi-user auth activated** (`DEMO_MODE=false` on the isolated instance): middleware gates
+  unauth → `/auth/sign-in`; email+password login (Supabase Auth, new `sb_publishable`/`sb_secret`
+  keys); **first-login binding** (`lib/auth/link.ts` `linkOrProvisionUser` wired into
+  `getEmployeeForUid`) provisions a distinct employee per auth user; per-user RLS verified (anon
+  0 rows, each user sees only their own row). `employees.user_id` CRUD added. 285 tests + build green.
+- **Sign-in page fixed:** app nav rail no longer leaks onto `/auth` (`Sidebar` returns null on
+  `/auth/*`); defined the missing `--radius-sm/--radius/--radius-lg` tokens (a latent app-wide bug —
+  square/unstyled inputs); rebuilt sign-in as a centered card with a hardened primary button
+  (explicit `#5b8def`, FOUC-proof).
+- **NEXT (approved): true multi-tenant onboarding** — updating the M8 PRD (org self-serve signup +
+  invite-by-email + member self-register + an `organizations` tenant model), then implement. M8's
+  hard dep (M5 auth+RLS) is met by this Phase 1; M7 is a soft (value) dep.
+
 **Still open (follow-ups, no code yet):**
 1. ~~Over-linking~~ — **RESOLVED 2026-07-06** (see session block above).
 2. **`ai_code_retention_30d` premature 0** — freshly-merged AI lines (<30d, not re-checked) score 0 instead

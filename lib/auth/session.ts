@@ -13,6 +13,8 @@ import { isConfigured } from '@/lib/config/env';
 import { isDemoMode } from '@/lib/config/flags';
 import { appTable, createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { linkOrProvisionUser } from './link';
+import type { EmployeeRecord } from '@/lib/db/onboarding';
 import type { AppRole, AuthUser } from '@/lib/types';
 
 /** The synthetic demo identity used for keyless boot (no DB, no session). */
@@ -127,7 +129,12 @@ export async function getEmployeeForUid(uid: string, email: string | null): Prom
     .maybeSingle();
 
   if (!employee) {
-    return isDemoMode() ? await demoUserFromDb() : null;
+    if (isDemoMode()) return await demoUserFromDb();
+    // First authenticated resolve for a real session: bind this uid to an employee
+    // (claim a roster seat by email, or provision a fresh one), then build from that
+    // record. Uses service-role internally (the RLS session can't set its own user_id).
+    const linked = await linkOrProvisionUser(uid, email);
+    return linked ? await authUserFromRecord(uid, email, linked) : null;
   }
 
   const emp = employee as {
@@ -142,6 +149,39 @@ export async function getEmployeeForUid(uid: string, email: string | null): Prom
 
   const roles = (((roleRows ?? []) as { role: AppRole }[]) || []).map((r) => r.role);
 
+  return {
+    userId: uid,
+    employeeId: emp.id,
+    functionId: emp.function_id,
+    displayName: emp.name,
+    email: emp.email ?? email,
+    roles: roles.length > 0 ? roles : ['developer'],
+    isDemo: emp.is_demo,
+  };
+}
+
+/**
+ * Build an AuthUser from a freshly-linked employee record. Roles are read via the
+ * service-role client (a just-provisioned user may have none RLS-visible yet); an
+ * employee with no roles defaults to 'developer'.
+ */
+async function authUserFromRecord(
+  uid: string,
+  email: string | null,
+  emp: EmployeeRecord,
+): Promise<AuthUser> {
+  let roles: AppRole[] = [];
+  try {
+    const admin = createAdminClient() as unknown as {
+      from: (t: string) => {
+        select: (c: string) => { eq: (k: string, v: unknown) => Promise<{ data: { role: AppRole }[] | null }> };
+      };
+    };
+    const { data } = await admin.from('employee_roles').select('role').eq('employee_id', emp.id);
+    roles = (data ?? []).map((r) => r.role);
+  } catch {
+    // service-role read failed — fall through to the default role below.
+  }
   return {
     userId: uid,
     employeeId: emp.id,

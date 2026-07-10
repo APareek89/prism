@@ -45,6 +45,7 @@ function admin(): LooseAdmin {
 
 export interface EmployeeRecord {
   id: string;
+  user_id: string | null;
   function_id: string;
   name: string;
   designation: string | null;
@@ -58,12 +59,13 @@ export interface EmployeeRecord {
 }
 
 const EMPLOYEE_COLS =
-  'id, function_id, name, designation, github_handle, email, claude_account_uuid, attribution_mode, match_status, active, is_demo';
+  'id, user_id, function_id, name, designation, github_handle, email, claude_account_uuid, attribution_mode, match_status, active, is_demo';
 
 function asEmployee(row: Record<string, unknown> | null): EmployeeRecord | null {
   if (!row) return null;
   return {
     id: row.id as string,
+    user_id: (row.user_id as string | null) ?? null,
     function_id: row.function_id as string,
     name: row.name as string,
     designation: (row.designation as string | null) ?? null,
@@ -107,6 +109,20 @@ export async function findByEmail(functionId: string, email: string): Promise<Em
       .select(EMPLOYEE_COLS)
       .eq('function_id', functionId)
       .eq('email', email)
+      .maybeSingle();
+    return error ? null : asEmployee(data);
+  } catch {
+    return null;
+  }
+}
+
+/** Find an employee by auth user_id (globally unique; the auth.uid → employee link). */
+export async function findByUserId(uid: string): Promise<EmployeeRecord | null> {
+  try {
+    const { data, error } = await admin()
+      .from('employees')
+      .select(EMPLOYEE_COLS)
+      .eq('user_id', uid)
       .maybeSingle();
     return error ? null : asEmployee(data);
   } catch {
@@ -177,6 +193,7 @@ export async function findSelfEmployee(functionId: string): Promise<EmployeeReco
 
 /** The mutable employee fields a write may set. */
 export interface EmployeeWrite {
+  user_id?: string | null;
   function_id?: string;
   name?: string;
   designation?: string | null;
