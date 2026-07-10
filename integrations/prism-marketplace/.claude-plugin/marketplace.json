@@ -1,0 +1,15 @@
+{
+  "name": "prism",
+  "owner": { "name": "Prism", "url": "https://github.com/APareek89/prism" },
+  "metadata": {
+    "description": "Prism plugins for measuring the ROI of Claude Code usage.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "prism-pr-link",
+      "source": "./prism-pr-link",
+      "description": "Forward Claude Code pr-link events (session -> repo#PR) to a Prism ingest endpoint for AI->PR attribution. Metadata only."
+    }
+  ]
+}

@@ -181,6 +181,24 @@ current state in 5 lines and wait for my instruction.
   the branch they're based on (`.claude/launch.json` is tracked, so a committed
   `.claude/settings.json` propagates).
 
+**Session (hook-path spike) — AI→PR link over telemetry + the pr-link ingest loop:**
+- **OTLP finding (measured against Claude Code 2.1.145):** the OTLP export carries identity
+  (`user.account_uuid`/`user.email`/`organization.id`) + tokens/model, but **no repo /
+  branch / PR-number** — `claude_code.pull_request.count` has "all standard attributes
+  only" ("join on session.id"). So telemetry can drive Usage/tokens for a fleet but
+  **cannot** do the AI→PR link; the 0.99 first-party signal must come from a first-party
+  channel, not OTLP.
+- **Hook path v0 built (capture→ingest→store):** a Claude Code plugin
+  (`integrations/prism-marketplace/prism-pr-link`) with a `PostToolUse(Bash)` hook forwards
+  `{sessionId, repo, prNumber}` to **`POST /api/ingest/pr-link`** (bearer `PRISM_INGEST_TOKEN`,
+  metadata-only, idempotent on `session_id+repo+pr_number`), landing in **`pr_link_ingest`**
+  (migration **0035**). Endpoint + token are config, never hardcoded (dev token now → org
+  managed-settings force-enable later — same artifact). Verified end-to-end (forwarder script
+  → route → row); 285 tests + build green.
+- **NOT wired yet:** teach the AI→PR linker (`lib/connectors/link`) to read `pr_link_ingest`
+  as a `pr_link`@0.99 source alongside `cc_sessions.pr_refs`. The OTLP receiver route is a
+  separate, later piece (do not point telemetry at the pr-link endpoint).
+
 **Still open (follow-ups, no code yet):**
 1. ~~Over-linking~~ — **RESOLVED 2026-07-06** (see session block above).
 2. **`ai_code_retention_30d` premature 0** — freshly-merged AI lines (<30d, not re-checked) score 0 instead
