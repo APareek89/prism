@@ -240,6 +240,31 @@ current state in 5 lines and wait for my instruction.
 3. **Function-scope improvement panel empty** — engine emits `kpi_daily` only at employee scope, so function
    has no rows for its improvement agent (persist function KPIs, or aggregate employee KPIs).
 
+**Session 2026-07-11 — W3 + multi-tenant GitHub + plugin distribution (isolated dev DB):**
+- **W3 roster + ingest self-serve:** org-admin employees read policy (migration **0037**,
+  `employees_admin_select` via `is_admin(function_id)`); `/api/org/members` (invite-by-email + roster) +
+  `MembersPanel`; per-org `ingest_token` (migration **0038**, `organizations.ingest_token`) — one token both
+  authenticates AND selects tenant; `/api/org/ingest-token` (get + rotate) + `IngestPanel`.
+- **Multi-tenant GitHub connect:** signed `state → org` HMAC round-trip (`lib/connectors/github/state.ts`) so
+  the install callback resolves the initiating org; `installation_id → function` map in the webhook; app made
+  public (`prismai1989`). Real connect verified (test org, `wittyurchin/intcam#2`).
+- **Ingest route is token-scoped:** `/api/ingest/pr-link` uses `resolveIngestFunctionId(token)` (token→org→
+  function); `middleware.ts` matcher excludes `api/ingest`. Real plugin forwarded a pr-link into the correct
+  org end-to-end.
+- **Plugin distribution — `PR #21` merged to `main`:** marketplace manifest moved to the **repo ROOT**
+  (`.claude-plugin/marketplace.json`; plugin `source` → `./integrations/prism-marketplace/prism-pr-link`) so
+  `/plugin marketplace add APareek89/prism` resolves. `/admin` IngestPanel snippet now emits the exact command
+  (not the `<prism-marketplace>` placeholder). **Install verified** — `marketplace add` + `prism-pr-link@prism`
+  install both succeed. Caveat confirmed live: the repo is **private** and Claude Code clones marketplaces over
+  **HTTPS**, so `add owner/repo` only works for users with repo access (needs `gh auth setup-git`); external
+  self-serve needs a **public** plugins repo or **MDM** managed-settings (same artifact, distributed as policy).
+- **Migrations on the isolated dev DB:** data 0001–0021/0030 + automation 0033 + **0035** (pr_link_ingest) +
+  **0036** (organizations) + **0037** (admin roster read) + **0038** (org ingest token).
+- **Branch state:** all W3/GitHub/ingest/tenant work lives on `claude/brave-feynman-17b98e` (**unpushed**);
+  only PR #21 (plugin marketplace, root manifest) is on `main`.
+- **NOT wired yet:** teach `lib/connectors/link` to read `pr_link_ingest` as a `pr_link`@0.99 source;
+  duplicate/fake-org anti-abuse (deferred, owner decision 2026-07-11).
+
 ---
 
 ## Stack & layout
