@@ -54,7 +54,7 @@ export function IngestPanel() {
   const snippet = `# Claude Code, then set these where the plugin runs:
 export PRISM_INGEST_URL="${url}"
 export PRISM_INGEST_TOKEN="${revealed ? (token ?? '<your token>') : '<reveal your token above>'}"
-/plugin marketplace add <prism-marketplace>
+/plugin marketplace add APareek89/prism
 /plugin install prism-pr-link@prism`;
 
   const codeStyle = {
