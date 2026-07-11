@@ -1,0 +1,7 @@
+{
+  "name": "prism-pr-link",
+  "version": "0.1.0",
+  "description": "Forwards Claude Code pr-link events (sessionId -> repo#PR) to Prism's /api/ingest/pr-link so AI-authored PRs link at high confidence even off the machine that ran the local scan. Metadata only: session id, repo, PR number. Never prompt text or code.",
+  "author": { "name": "Prism" },
+  "keywords": ["prism", "telemetry", "pr-link", "attribution"]
+}
