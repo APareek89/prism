@@ -89,6 +89,21 @@ describe.skipIf(!process.env.SUPABASE_DB_URL)('full signup → invite → join (
     expect(anonOrgs).toBe(0);
   });
 
+  it('5. admin reads + rotates the org ingest token via /api/org/ingest-token', async () => {
+    const cookie = cookieHeader(await session(FOUNDER, FPW));
+    const g = await (await fetch(`${BASE}/api/org/ingest-token`, { headers: { cookie } })).json();
+    expect(g.ok).toBe(true);
+    expect(g.token).toMatch(/^pi_/);
+    expect(g.ingestUrl).toMatch(/\/api\/ingest\/pr-link$/);
+    const before = g.token;
+    const r = await (await fetch(`${BASE}/api/org/ingest-token`, {
+      method: 'POST', headers: { cookie, 'content-type': 'application/json' }, body: JSON.stringify({ action: 'rotate' }),
+    })).json();
+    expect(r.ok).toBe(true);
+    expect(r.token).toMatch(/^pi_/);
+    expect(r.token).not.toBe(before); // rotated → new token
+  });
+
   afterAll(async () => {
     if (!process.env.SUPABASE_DB_URL) return;
     const c = pgc(); await c.connect();
