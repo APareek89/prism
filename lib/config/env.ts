@@ -97,6 +97,12 @@ const serverSchema = z.object({
   // Optional bearer token for the studio's auth-gated reads (GET /api/course/:id).
   // Blank in demo; when absent Prism only reaches the studio's public endpoints.
   LEARNING_STUDIO_TOKEN: z.string().optional(),
+
+  // Prism ingest (hook path → POST /api/ingest/pr-link). The bearer token the Claude
+  // Code plugin hook presents when forwarding a pr-link event. The config seam: a
+  // per-developer token today, an org token distributed via managed settings later.
+  // Absent ⇒ the ingest route answers 'not_configured' (never trusts an unauthed post).
+  PRISM_INGEST_TOKEN: optionalSecret(),
 });
 
 export type PublicEnv = z.infer<typeof publicSchema>;

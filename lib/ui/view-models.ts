@@ -194,6 +194,129 @@ export interface SizingRuleDTO {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ROI statement v0 (docs/prd/2026-08-roi-statement-v0.md) — the one-page,
+// print-friendly artifact a CTO forwards to a CFO. Three load-bearing numbers over
+// the trailing 28-day window, each with an evidence badge + a same-page drill-down.
+// Deliberately NO bands, NO composite index, NO L-levels, NO narration, NO USD.
+// Nulls render "awaiting signal" (never a fabricated 0 / 0%).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Page header: function + window identity + generated stamp. */
+export interface StatementHeaderDTO {
+  functionName: string;
+  windowDays: number; // 28
+  windowLabel: string; // "28 days ending 2026-07-06"
+  since: string; // window start (inclusive), YYYY-MM-DD
+  end: string; // window end (inclusive) = as-of date, YYYY-MM-DD
+  generatedAtLabel: string; // "2026-07-06 14:32 UTC"
+}
+
+/** One method row of number 1's evidence badge (PRs attributed to their strongest link). */
+export interface StatementLinkMethodDTO {
+  method: string; // 'pr_link' | 'sha' | 'branch' | 'coauthor'
+  label: string; // "first-party" | "sha match" | "branch" | "co-author"
+  confidence: number; // representative confidence for the method, e.g. 0.99
+  prCount: number; // PRs whose strongest link uses this method
+}
+
+/** One tool row of number 1's per-tool session split. */
+export interface StatementToolShareDTO {
+  source: string; // 'claude_code' | 'codex'
+  label: string; // "Claude Code" | "Codex"
+  sessionCount: number;
+  sharePct: number; // 0–100, share of window sessions
+}
+
+/** A tool that produced zero links but has window sessions in a window-PR repo (the gray slice). */
+export interface StatementUnattributedToolDTO {
+  source: string;
+  label: string;
+  sessionCount: number; // window sessions of this tool in window-PR repos
+}
+
+/** Number 1 — AI-assisted share of shipped work. */
+export interface StatementShareDTO {
+  sharePct: number | null; // null ⇒ awaiting signal (denominator 0)
+  aiPrCount: number;
+  totalPrCount: number;
+  linkedPrCount: number; // PRs with ≥1 pr_ai_link row (badge total)
+  methods: StatementLinkMethodDTO[];
+  perTool: StatementToolShareDTO[];
+  unattributedTools: StatementUnattributedToolDTO[];
+}
+
+/** One cohort of number 2 (AI or human baseline). */
+export interface StatementRevertCohortDTO {
+  revertRatePct: number | null; // null ⇒ awaiting signal (denominator 0)
+  reverted: number;
+  total: number;
+  smallSample: boolean; // total in (0,5) ⇒ show the "too few to conclude" banner
+}
+
+/** Number 2 — held-up-after-merge, AI vs human baseline (ALWAYS both, never AI alone). */
+export interface StatementReliabilityDTO {
+  ai: StatementRevertCohortDTO;
+  human: StatementRevertCohortDTO;
+  ruleText: string; // the ≤14d detector rule, stated
+}
+
+/** Number 3 — tokens per shipped AI PR (tokens only, no USD). */
+export interface StatementTokensDTO {
+  tokensPerAiPr: number | null; // headline (all link methods)
+  tokensPerAiPrExact: number | null; // first-party (pr_link) links only
+  aiPrCount: number; // headline denominator
+  exactAiPrCount: number; // first-party denominator
+  linkedTokens: number; // headline numerator
+  exactLinkedTokens: number; // first-party numerator
+  unattributedTokens: number; // window session tokens linked to NO PR (exploration)
+}
+
+/** Drill-down row: one window PR. */
+export interface StatementPrRowDTO {
+  number: number;
+  repo: string;
+  title: string;
+  mergedAtLabel: string; // YYYY-MM-DD
+  aiAssisted: boolean;
+  methodLabel: string; // strongest link label, or "—"
+  confidence: number | null;
+}
+
+/** Drill-down row: one reverted PR (either cohort). */
+export interface StatementRevertRowDTO {
+  number: number;
+  repo: string;
+  title: string;
+  cohort: 'ai' | 'human';
+  revertedAtLabel: string; // YYYY-MM-DD
+}
+
+/** Drill-down row: one session linked to a window AI PR (metadata only — never prompt text). */
+export interface StatementSessionRowDTO {
+  tsLabel: string; // YYYY-MM-DD
+  source: string;
+  sourceLabel: string;
+  tokens: number;
+  methodLabel: string; // strongest link method for this session
+}
+
+export interface StatementDrilldownsDTO {
+  windowPrs: StatementPrRowDTO[];
+  reverts: StatementRevertRowDTO[];
+  linkedSessions: StatementSessionRowDTO[];
+}
+
+/** The full ROI statement page payload (one DTO, function scope). */
+export interface StatementDTO {
+  header: StatementHeaderDTO;
+  share: StatementShareDTO;
+  reliability: StatementReliabilityDTO;
+  tokens: StatementTokensDTO;
+  drilldowns: StatementDrilldownsDTO;
+  honestyLine: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Data read-API contract (implemented in lib/db by the data agent; consumed by
 // the view RSCs). All return safe empty/awaiting-signal shapes when there is no
 // data. Signatures are the authoritative names the view agents import.
@@ -216,4 +339,5 @@ export interface SizingRuleDTO {
 //   getRosterMatches(functionId): Promise<RosterMatchDTO[]>
 //   getIndexConfig(functionId): Promise<IndexConfigRowDTO[]>
 //   getSizingRule(functionId): Promise<SizingRuleDTO>
+//   getStatement(functionId, date): Promise<StatementDTO>   // ROI statement v0 (function scope)
 // ─────────────────────────────────────────────────────────────────────────────

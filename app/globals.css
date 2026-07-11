@@ -3,6 +3,7 @@
   --ink:#eef1f7; --mut:#8b95ac; --mut2:#5f6a83;
   --usage:#5b8def; --eff:#2dd4bf; --effness:#f5a524; --prof:#a78bfa;
   --good:#3ecf8e; --bad:#f0616d; --warn:#f5a524;
+  --radius-sm:8px; --radius:12px; --radius-lg:16px;
   --disp:'Space Grotesk',sans-serif; --body:'IBM Plex Sans',sans-serif; --mono:'JetBrains Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -192,3 +193,54 @@ a.course:hover .opencourse{background:#a78bfa1c}
 .muted{color:var(--mut)}
 .muted2{color:var(--mut2)}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ── ROI statement v0 (/statement) — one print-friendly page, three numbers ── */
+.stmt{max-width:920px}
+.stmt-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:24px;flex-wrap:wrap}
+.stmt-ttl h1{font-family:var(--disp);font-size:26px;font-weight:700;letter-spacing:.01em}
+.stmt-ttl p{color:var(--mut);font-size:14px;margin-top:4px}
+.stmt-metacol{display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-family:var(--mono);font-size:11.5px;text-align:right}
+.stmt-window{color:var(--ink)}
+.stmt-gen{color:var(--mut2)}
+.stmt-nums{display:flex;flex-direction:column;gap:16px;margin-bottom:20px}
+.stmt-num{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px}
+.stmt-cap{display:inline-block;font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);text-decoration:none;border-bottom:1px dotted transparent}
+a.stmt-cap:hover{color:var(--ink);border-bottom-color:var(--mut)}
+.stmt-big{font-family:var(--disp);font-size:56px;font-weight:700;line-height:1;margin:10px 0 6px;letter-spacing:-.02em}
+.stmt-mid{font-family:var(--disp);font-size:38px;font-weight:700;line-height:1;margin:6px 0 4px}
+.stmt-sub{font-size:13px;color:var(--mut)}
+.stmt-await{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--mut2);letter-spacing:0}
+.stmt-warn{color:var(--warn)}
+.stmt-evi{margin-top:12px;font-family:var(--mono);font-size:11.5px;color:var(--mut);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 11px;display:inline-block}
+.stmt-tool{margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--mut)}
+.stmt-gray{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--mut2)}
+.stmt-pair{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+.stmt-half{border-left:2px solid var(--line2);padding-left:14px}
+.stmt-half-lab{font-family:var(--mono);font-size:11px;color:var(--mut2);text-transform:uppercase;letter-spacing:.06em}
+.stmt-foot{margin-top:4px;color:var(--mut2);font-size:11.5px;font-family:var(--mono);border-top:1px solid var(--line);padding-top:14px;line-height:1.5}
+.stmt-drill{margin-top:34px}
+.stmt-drill-h{font-family:var(--disp);font-size:12px;font-weight:600;color:var(--mut);margin-bottom:14px;text-transform:uppercase;letter-spacing:.08em}
+.stmt-table{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px}
+.stmt-empty{color:var(--mut2);font-size:12.5px;font-family:var(--mono);padding:6px 2px}
+@media(max-width:640px){.stmt-pair{grid-template-columns:1fr}}
+
+/* Print: one clean Letter/A4 page — white, no chrome, no drill-downs. */
+@media print{
+  body{background:#fff;color:#111}
+  aside{display:none!important}
+  .stmt-drill{display:none!important}
+  .main.stmt{max-width:none;padding:0;margin:0}
+  .stmt-nums{gap:10px;margin-bottom:14px}
+  .stmt-num,.stmt-table{background:#fff;border:1px solid #ddd;break-inside:avoid;padding:12px 16px}
+  .stmt-head{border-color:#ccc;margin-bottom:16px;padding-bottom:12px}
+  .stmt-ttl h1,.stmt-big,.stmt-mid{color:#111}
+  .stmt-ttl p,.stmt-sub,.stmt-half-lab{color:#444}
+  .stmt-cap,.stmt-window,.stmt-tool,.stmt-gray,.stmt-foot,.stmt-gen{color:#555}
+  .stmt-big{font-size:44px;margin:6px 0 4px}
+  .stmt-mid{font-size:30px}
+  .stmt-evi{background:#f4f4f5;border-color:#e4e4e7;color:#333}
+  .stmt-half{border-left-color:#ccc}
+  .stmt-await{color:#888}
+  .stmt-warn{color:#a15c00}
+  @page{margin:14mm}
+}

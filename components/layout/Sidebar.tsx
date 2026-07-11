@@ -13,6 +13,11 @@ import { NAV_ITEMS, isActive } from '@/lib/nav/routes';
 export function Sidebar() {
   const pathname = usePathname() ?? '/';
 
+  // The app chrome (nav rail) must never appear on the auth screens — you can't be
+  // authenticated there, so the nav is both wrong and misleading. Render nothing;
+  // AppShell's <main> then fills the full width and the sign-in card centers.
+  if (pathname.startsWith('/auth')) return null;
+
   return (
     <aside
       style={{

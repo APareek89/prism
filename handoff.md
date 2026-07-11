@@ -157,12 +157,144 @@ current state in 5 lines and wait for my instruction.
   Pre-existing keyless-build gap found: `/admin` prerender fails with NO `.env.local`
   (violates ownership-map invariant; spawned as separate task).
 
+**Session 2026-07-06 — Month-1 build, part 2 (ROI statement v0 + worktree env hook):**
+- **ROI statement v0 shipped** (spec: `docs/prd/2026-08-roi-statement-v0.md`): new
+  `/statement` route (`app/(views)/statement/page.tsx`) — one print-friendly page, the
+  three load-bearing numbers over the trailing 28d, each with an evidence badge + a
+  same-page drill-down (excluded from print). No bands/index/L-levels/USD. Pure derive
+  layer `lib/db/statement-derive.ts` (+ 19 fixture tests) behind `lib/db/statement.ts`
+  `getStatement(functionId, date)`; DTOs added to `lib/ui/view-models.ts`; barrel
+  export in `lib/db/index.ts`; `.stmt-*` + `@media print` in `app/globals.css`.
+  Verified on real dogfood data (fn "My Engineering"): share **100%** (10/10, badge "10
+  first-party (0.99)"), held-up **AI 0% / human awaiting-signal** (0 reverts), **655.3k
+  tokens/AI PR**, 58.5M unattributed. Live column probe + typecheck + 273 tests + build
+  all green.
+- **Gotcha (dates):** dogfood PRs actually merged **2026-07-01 UTC**; a `merged_at::date`
+  read via node-pg *looked* like 06-30 — that's a node-pg local-TZ (IST +05:30) `Date`
+  parsing artifact, not the stored value. Statement dates normalize to UTC
+  (`new Date(iso).toISOString()`) so labels + window bounds are tz-independent (matches
+  `lib/scoring/window.ts`); regression test locks it in.
+- **Worktree env hook:** `scripts/copy-env.sh` + `.claude/settings.json` SessionStart
+  hook copy the main repo's gitignored `.env.local` into a fresh worktree (idempotent,
+  no-clobber, no-op in main). Fixes new worktrees starting without env (which blocks
+  `npm run dev` + the column-truth check). Only helps FUTURE worktrees once it lands on
+  the branch they're based on (`.claude/launch.json` is tracked, so a committed
+  `.claude/settings.json` propagates).
+
+**Session (hook-path spike) — AI→PR link over telemetry + the pr-link ingest loop:**
+- **OTLP finding (measured against Claude Code 2.1.145):** the OTLP export carries identity
+  (`user.account_uuid`/`user.email`/`organization.id`) + tokens/model, but **no repo /
+  branch / PR-number** — `claude_code.pull_request.count` has "all standard attributes
+  only" ("join on session.id"). So telemetry can drive Usage/tokens for a fleet but
+  **cannot** do the AI→PR link; the 0.99 first-party signal must come from a first-party
+  channel, not OTLP.
+- **Hook path v0 built (capture→ingest→store):** a Claude Code plugin
+  (`integrations/prism-marketplace/prism-pr-link`) with a `PostToolUse(Bash)` hook forwards
+  `{sessionId, repo, prNumber}` to **`POST /api/ingest/pr-link`** (bearer `PRISM_INGEST_TOKEN`,
+  metadata-only, idempotent on `session_id+repo+pr_number`), landing in **`pr_link_ingest`**
+  (migration **0035**). Endpoint + token are config, never hardcoded (dev token now → org
+  managed-settings force-enable later — same artifact). Verified end-to-end (forwarder script
+  → route → row); 285 tests + build green.
+- **NOT wired yet:** teach the AI→PR linker (`lib/connectors/link`) to read `pr_link_ingest`
+  as a `pr_link`@0.99 source alongside `cc_sessions.pr_refs`. The OTLP receiver route is a
+  separate, later piece (do not point telemetry at the pr-link endpoint).
+
+**Session (Phase 1) — multiple logins + sign-in page fix (on the isolated dev DB):**
+- **Multi-user auth activated** (`DEMO_MODE=false` on the isolated instance): middleware gates
+  unauth → `/auth/sign-in`; email+password login (Supabase Auth, new `sb_publishable`/`sb_secret`
+  keys); **first-login binding** (`lib/auth/link.ts` `linkOrProvisionUser` wired into
+  `getEmployeeForUid`) provisions a distinct employee per auth user; per-user RLS verified (anon
+  0 rows, each user sees only their own row). `employees.user_id` CRUD added. 285 tests + build green.
+- **Sign-in page fixed:** app nav rail no longer leaks onto `/auth` (`Sidebar` returns null on
+  `/auth/*`); defined the missing `--radius-sm/--radius/--radius-lg` tokens (a latent app-wide bug —
+  square/unstyled inputs); rebuilt sign-in as a centered card with a hardened primary button
+  (explicit `#5b8def`, FOUC-proof).
+- **NEXT (approved): true multi-tenant onboarding** — updating the M8 PRD (org self-serve signup +
+  invite-by-email + member self-register + an `organizations` tenant model), then implement. M8's
+  hard dep (M5 auth+RLS) is met by this Phase 1; M7 is a soft (value) dep.
+
+**Session (M8 v2) — TRUE MULTI-TENANT onboarding (W1+W2, on the isolated dev DB):**
+- **Tenant model (migration 0036):** `organizations` = tenant root; `functions.org_id` (one
+  function per org in v1, 1:many-ready); `current_org_id()` SECURITY DEFINER helper;
+  organizations RLS = members read only their own org. Existing function backfilled into an org.
+- **Org-scoped resolver:** `resolveBootstrapFunctionId` (11 admin routes) + `getCurrentFunctionId`
+  (views) resolve the CALLER's org function — no first-row fallback (demo fallback kept).
+- **Org signup + invite→join:** `lib/onboarding/org.ts createOrganization` (org+function+admin
+  employee+admin role); `lib/auth/signup.ts signUpAction` (invited email → join that org via
+  `findPendingInviteByEmail`; else org name → create a tenant; via service-role `admin.createUser`,
+  v1 permissive — duplicate/fake orgs deferred per owner decision 2026-07-11); `linkOrProvisionUser`
+  now multi-tenant (claim an invited seat by email; no bootstrap auto-provision); SignInForm has a
+  create-account / org-name mode.
+- **Verified with the REAL code** (node-env integration test `lib/auth/onboarding-mt.test.ts`,
+  `describe.skipIf` without DB): org signup, invite→join, and **cross-tenant isolation** (org A
+  can't see org B; anon sees none). 285 unit tests + build green. (Gotcha: integration tests that
+  build the service-role client must set `// @vitest-environment node` — jsdom's `window` trips the
+  server-only guard.)
+- **NEXT (W3):** admin invite-by-email UI/route (reuse `provisionEmployee`) + an org-admin
+  employees read policy — employees RLS is self-only today, so an admin can't yet list their roster.
+
 **Still open (follow-ups, no code yet):**
 1. ~~Over-linking~~ — **RESOLVED 2026-07-06** (see session block above).
 2. **`ai_code_retention_30d` premature 0** — freshly-merged AI lines (<30d, not re-checked) score 0 instead
    of pending/null, dragging Effectiveness 100→66.7 and L1 ~46.5→33.2.
 3. **Function-scope improvement panel empty** — engine emits `kpi_daily` only at employee scope, so function
    has no rows for its improvement agent (persist function KPIs, or aggregate employee KPIs).
+
+**Session 2026-07-11 — W3 + multi-tenant GitHub + plugin distribution (isolated dev DB):**
+- **W3 roster + ingest self-serve:** org-admin employees read policy (migration **0037**,
+  `employees_admin_select` via `is_admin(function_id)`); `/api/org/members` (invite-by-email + roster) +
+  `MembersPanel`; per-org `ingest_token` (migration **0038**, `organizations.ingest_token`) — one token both
+  authenticates AND selects tenant; `/api/org/ingest-token` (get + rotate) + `IngestPanel`.
+- **Multi-tenant GitHub connect:** signed `state → org` HMAC round-trip (`lib/connectors/github/state.ts`) so
+  the install callback resolves the initiating org; `installation_id → function` map in the webhook; app made
+  public (`prismai1989`). Real connect verified (test org, `wittyurchin/intcam#2`).
+- **Ingest route is token-scoped:** `/api/ingest/pr-link` uses `resolveIngestFunctionId(token)` (token→org→
+  function); `middleware.ts` matcher excludes `api/ingest`. Real plugin forwarded a pr-link into the correct
+  org end-to-end.
+- **Plugin distribution — `PR #21` merged to `main`:** marketplace manifest moved to the **repo ROOT**
+  (`.claude-plugin/marketplace.json`; plugin `source` → `./integrations/prism-marketplace/prism-pr-link`) so
+  `/plugin marketplace add APareek89/prism` resolves. `/admin` IngestPanel snippet now emits the exact command
+  (not the `<prism-marketplace>` placeholder). **Install verified** — `marketplace add` + `prism-pr-link@prism`
+  install both succeed. Caveat confirmed live: the repo is **private** and Claude Code clones marketplaces over
+  **HTTPS**, so `add owner/repo` only works for users with repo access (needs `gh auth setup-git`); external
+  self-serve needs a **public** plugins repo or **MDM** managed-settings (same artifact, distributed as policy).
+- **Migrations on the isolated dev DB:** data 0001–0021/0030 + automation 0033 + **0035** (pr_link_ingest) +
+  **0036** (organizations) + **0037** (admin roster read) + **0038** (org ingest token).
+- **Branch state:** all W3/GitHub/ingest/tenant work lives on `claude/brave-feynman-17b98e` (**unpushed**);
+  only PR #21 (plugin marketplace, root manifest) is on `main`.
+- **NOT wired yet:** teach `lib/connectors/link` to read `pr_link_ingest` as a `pr_link`@0.99 source;
+  duplicate/fake-org anti-abuse (deferred, owner decision 2026-07-11).
+
+**Session 2026-07-12 — TOKENLESS pr-link (client secret removed entirely):**
+- **Decision (owner-driven, via a public-plugin ecosystem survey):** the plugin holds NO client
+  secret and writes NOTHING into the developer's git. Rejected in turn: token-typed-in-session
+  (leaks into the transcript Prism itself ingests), out-of-band terminal/keychain (clunky), the
+  opt-out-able `Co-authored-by: Claude` trailer as a join key, and any hook-written commit/PR marker.
+  Landing point: the hook POSTs a metadata-only beacon and **Prism resolves the tenant SERVER-SIDE
+  from the PR's repo** — the GitHub App installation IS the org authorization.
+- **Built (`3b1ceff`):** `resolveIngestFunctionIdByRepo(repo)` = exactly-one match on
+  `functions.repo_ids` (0/ambiguous → ignore, never misroute). `/api/ingest/pr-link` parses first,
+  resolves by repo, **bearer token now OPTIONAL** (self-auth fallback); unknown/ambiguous repo →
+  `202` accept-but-ignore (open beacon never errors the hook, never leaks which repos are connected).
+  `forward-pr-link.mjs` drops the token gate; keeps a `/tmp/prism-hook.log` trace (**kept on at
+  owner's request — do not remove**).
+- **PROVEN E2E with the REAL hook in Claude Desktop:** `gh pr view 3` in a Desktop Code session →
+  hook fired `hasToken:false` → matched `wittyurchin/intcam#3` → POST 200 → row landed under org
+  **test** (session `d1b46f8f…`). Plus 3/3 tokenless integration tests, 289 unit tests, typecheck clean.
+- **Confirmed platform facts (docs + empirical):** Desktop runs plugin hooks (same engine as CLI);
+  hooks inherit `env` from `settings.local.json`; Claude Code HAS native plugin secret config
+  (`userConfig` `sensitive:true` → OS keychain + `CLAUDE_PLUGIN_OPTION_*`, and an `http` hook type) —
+  kept in the back pocket as the fallback if a client token is ever required (verify bug #62442 first).
+- **Follow-ups DONE (`da0dc6a` `9a8726e` `7a6f913`):** (1) `/admin` IngestPanel is now **zero-config**
+  — leads with install-only, token demoted to an "Advanced — optional fallback" toggle; (2) **anti-spoof**
+  shipped — `verifyPrExists()` confirms the PR via the org's GitHub App (definitive 404 → reject,
+  **fail-open** on missing install / transient error) on the tokenless path only, plus a best-effort
+  per-IP in-memory rate limit (60/min); (3) **`linkAiToPr` consumes `pr_link_ingest`** as `pr_link`@0.99
+  (folded into the session's pr_refs), with a new integration test proving beacon → 0.99 link.
+  Verified: integration suite 13/13 + 289 unit tests + typecheck all green.
+- **Still open:** **rotate the exposed dev token `pi_fe31…`**; the rate limit is single-instance (shared
+  store = the multi-instance upgrade); the real intcam#3 beacon stays an ORPHAN until the test org's
+  session `d1b46f8f…` is ingested (scan/OTLP) — then it links at 0.99.
 
 ---
 

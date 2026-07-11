@@ -78,6 +78,6 @@ export const config = {
   // lookahead keeps webhooks / pipeline / courses / inngest / health and Next internals
   // out of the auth path so they're never redirected.
   matcher: [
-    '/((?!api/inngest|api/webhooks|api/connectors|api/pipeline|api/courses|api/health|.*/webhook|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
+    '/((?!api/inngest|api/webhooks|api/connectors|api/pipeline|api/courses|api/health|api/ingest|.*/webhook|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
   ],
 };

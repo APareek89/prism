@@ -19,8 +19,10 @@
 import { withAdmin } from '@/lib/auth/guards';
 import { getAuthUser } from '@/lib/auth/session';
 import { isAdmin } from '@/lib/auth/roles';
+import { serverEnv } from '@/lib/config/env';
 import { GitHubConnector } from '@/lib/connectors/github';
 import { getApp, getInstallationOctokit, isGithubConfigured } from '@/lib/connectors/github/client';
+import { signState, verifyState } from '@/lib/connectors/github/state';
 import {
   ok,
   badRequest,
@@ -32,6 +34,13 @@ import {
 } from '../../_lib/route-helpers';
 
 export const dynamic = 'force-dynamic';
+
+// Multi-tenant: carry the initiating org's function through the GitHub install round-trip
+// in a SIGNED `state` (lib/connectors/github/state) so the callback attributes the
+// installation to the right tenant deterministically.
+function stateSecret(): string {
+  return serverEnv.GITHUB_APP_WEBHOOK_SECRET || serverEnv.GITHUB_APP_CLIENT_SECRET || 'prism-state';
+}
 
 /** Where to send the user back to after the install callback. */
 function adminUrl(req: Request, params: Record<string, string>): string {
@@ -86,8 +95,10 @@ export async function GET(req: Request): Promise<Response> {
     }
     if (!slug) return badRequest('GitHub App slug not found for this App ID');
     const ghUrl = new URL(`https://github.com/apps/${slug}/installations/new`);
-    // Round-trip a marker so the callback origin is unambiguous.
-    ghUrl.searchParams.set('state', 'prism-connect');
+    // Sign the initiating admin's org function into `state` so the callback attributes
+    // the install to the right tenant (falls back to a plain marker if no org resolves).
+    const initFn = await resolveBootstrapFunctionId();
+    ghUrl.searchParams.set('state', initFn ? signState(initFn, stateSecret()) : 'prism-connect');
     return Response.redirect(ghUrl.toString(), 302);
   }
 
@@ -102,7 +113,8 @@ export async function GET(req: Request): Promise<Response> {
     return Response.redirect(adminUrl(req, { github: 'bad_installation_id' }), 302);
   }
 
-  const functionId = await resolveBootstrapFunctionId();
+  // Prefer the signed `state` (deterministic tenant), else the admin's session.
+  const functionId = verifyState(url.searchParams.get('state'), stateSecret()) ?? (await resolveBootstrapFunctionId());
   if (!functionId) {
     return Response.redirect(adminUrl(req, { github: 'no_function' }), 302);
   }

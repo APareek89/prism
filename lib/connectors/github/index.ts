@@ -16,6 +16,7 @@
 
 import { Webhooks } from '@octokit/webhooks';
 import { serverEnv } from '@/lib/config/env';
+import { isDemoMode } from '@/lib/config/flags';
 import type { ConnectorStatus } from '@/lib/types/db';
 import {
   getConnectorRecord,
@@ -355,12 +356,18 @@ async function resolveWebhookFunctionId(payload: string): Promise<string | null>
     // fall through to single-function fallback
   }
 
-  try {
-    const { data } = await db.from('functions').select('id').limit(1).maybeSingle();
-    return (data?.id as string | undefined) ?? null;
-  } catch {
-    return null;
+  // Single-tenant DEMO only: fall back to the one function row. In multi-tenant an
+  // installation with no stored connector must NOT be misattributed to some other org —
+  // drop the event (the caller returns "no function to route webhook to").
+  if (isDemoMode()) {
+    try {
+      const { data } = await db.from('functions').select('id').limit(1).maybeSingle();
+      return (data?.id as string | undefined) ?? null;
+    } catch {
+      return null;
+    }
   }
+  return null;
 }
 
 /** Minimal webhook payload shape (only the fields we read). */

@@ -179,6 +179,33 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
   }
   if (sessions.length === 0) return stats;
 
+  // 2b. First-party pr-link BEACONS (pr_link_ingest) — the prism-pr-link plugin hook's
+  //     tokenless forwards ({session_id, repo, pr_number}). Fold each into its session's
+  //     pr_refs so it scores as a pr_link@0.99 signal, identical to Claude Code's built-in
+  //     pr-link events (cc_sessions.pr_refs). Best-effort: branch/coauthor/pr_refs still
+  //     work without it. A beacon whose session_id isn't ingested yet is simply an orphan
+  //     (no session row to attach to) and links nothing until that session lands.
+  const ingestRefsBySession = new Map<string, PrRef[]>();
+  try {
+    const { data } = await db
+      .from('pr_link_ingest')
+      .select('session_id, repo, pr_number')
+      .eq('function_id', functionId);
+    const rows = (Array.isArray(data) ? data : []) as Array<{
+      session_id?: string;
+      repo?: string;
+      pr_number?: number;
+    }>;
+    for (const r of rows) {
+      if (!r.session_id || typeof r.repo !== 'string' || typeof r.pr_number !== 'number') continue;
+      const list = ingestRefsBySession.get(r.session_id) ?? [];
+      list.push({ repo: r.repo, number: r.pr_number });
+      ingestRefsBySession.set(r.session_id, list);
+    }
+  } catch {
+    // beacon source is optional; the other signals still produce links.
+  }
+
   // 3. Co-author commits for these PRs (for the coauthor signal). Best-effort.
   const coauthorShasByPr = new Map<string, string[]>();
   try {
@@ -208,6 +235,8 @@ export async function linkAiToPr(functionId: string, now: Date = new Date()): Pr
         prRefs.push({ repo: r.repo, number: r.number });
       }
     }
+    // fold in the plugin-hook beacons for this session_id (same pr_link@0.99 signal).
+    if (s.session_id) for (const r of ingestRefsBySession.get(s.session_id) ?? []) prRefs.push(r);
     return { rowId: s.id, sessionId: s.session_id, branch: s.branch, prRefs };
   });
   const canonicals = canonicalizeSessions(lite).map((c) => ({
