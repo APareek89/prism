@@ -107,6 +107,30 @@ export async function resolveIngestFunctionId(token: string | null): Promise<str
   }
 }
 
+/**
+ * Resolve the function a TOKENLESS ingest beacon should write to — from the PR's repo.
+ *
+ * The tenant is established SERVER-SIDE: the repo is matched against `functions.repo_ids`
+ * (populated by the GitHub App install callback), so the GitHub App installation IS the
+ * org authorization — no client secret ever leaves the developer's machine. Returns the
+ * function id ONLY when exactly one function claims the repo:
+ *   0 matches  → repo not connected to any org (caller ignores the beacon).
+ *   >1 matches → ambiguous ownership (caller ignores; never misroute one org's data).
+ * Never throws.
+ */
+export async function resolveIngestFunctionIdByRepo(repo: string): Promise<string | null> {
+  if (!repo || !isConfigured('supabase')) return null;
+  try {
+    const db = appTable(createAdminClient());
+    const { data } = await db.from('functions').select('id, repo_ids');
+    const rows = (data as { id?: string; repo_ids?: string[] | null }[] | null) ?? [];
+    const matches = rows.filter((f) => Array.isArray(f.repo_ids) && f.repo_ids.includes(repo));
+    return matches.length === 1 ? (matches[0]!.id ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Read a JSON body safely; returns null on empty/invalid bodies (callers 400). */
 export async function readJson<T = Record<string, unknown>>(req: Request): Promise<T | null> {
   try {
