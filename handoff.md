@@ -265,6 +265,30 @@ current state in 5 lines and wait for my instruction.
 - **NOT wired yet:** teach `lib/connectors/link` to read `pr_link_ingest` as a `pr_link`@0.99 source;
   duplicate/fake-org anti-abuse (deferred, owner decision 2026-07-11).
 
+**Session 2026-07-12 — TOKENLESS pr-link (client secret removed entirely):**
+- **Decision (owner-driven, via a public-plugin ecosystem survey):** the plugin holds NO client
+  secret and writes NOTHING into the developer's git. Rejected in turn: token-typed-in-session
+  (leaks into the transcript Prism itself ingests), out-of-band terminal/keychain (clunky), the
+  opt-out-able `Co-authored-by: Claude` trailer as a join key, and any hook-written commit/PR marker.
+  Landing point: the hook POSTs a metadata-only beacon and **Prism resolves the tenant SERVER-SIDE
+  from the PR's repo** — the GitHub App installation IS the org authorization.
+- **Built (`3b1ceff`):** `resolveIngestFunctionIdByRepo(repo)` = exactly-one match on
+  `functions.repo_ids` (0/ambiguous → ignore, never misroute). `/api/ingest/pr-link` parses first,
+  resolves by repo, **bearer token now OPTIONAL** (self-auth fallback); unknown/ambiguous repo →
+  `202` accept-but-ignore (open beacon never errors the hook, never leaks which repos are connected).
+  `forward-pr-link.mjs` drops the token gate; keeps a `/tmp/prism-hook.log` trace (**kept on at
+  owner's request — do not remove**).
+- **PROVEN E2E with the REAL hook in Claude Desktop:** `gh pr view 3` in a Desktop Code session →
+  hook fired `hasToken:false` → matched `wittyurchin/intcam#3` → POST 200 → row landed under org
+  **test** (session `d1b46f8f…`). Plus 3/3 tokenless integration tests, 289 unit tests, typecheck clean.
+- **Confirmed platform facts (docs + empirical):** Desktop runs plugin hooks (same engine as CLI);
+  hooks inherit `env` from `settings.local.json`; Claude Code HAS native plugin secret config
+  (`userConfig` `sensitive:true` → OS keychain + `CLAUDE_PLUGIN_OPTION_*`, and an `http` hook type) —
+  kept in the back pocket as the fallback if a client token is ever required (verify bug #62442 first).
+- **Follow-ups:** anti-spoof hardening (verify the PR exists via the App webhook/API + rate-limit the
+  open endpoint); update `/admin` IngestPanel to the zero-config story (token no longer required);
+  teach `lib/connectors/link` to consume `pr_link_ingest`. **Rotate the exposed dev token `pi_fe31…`.**
+
 ---
 
 ## Stack & layout
