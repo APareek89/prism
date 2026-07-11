@@ -285,9 +285,16 @@ current state in 5 lines and wait for my instruction.
   hooks inherit `env` from `settings.local.json`; Claude Code HAS native plugin secret config
   (`userConfig` `sensitive:true` → OS keychain + `CLAUDE_PLUGIN_OPTION_*`, and an `http` hook type) —
   kept in the back pocket as the fallback if a client token is ever required (verify bug #62442 first).
-- **Follow-ups:** anti-spoof hardening (verify the PR exists via the App webhook/API + rate-limit the
-  open endpoint); update `/admin` IngestPanel to the zero-config story (token no longer required);
-  teach `lib/connectors/link` to consume `pr_link_ingest`. **Rotate the exposed dev token `pi_fe31…`.**
+- **Follow-ups DONE (`da0dc6a` `9a8726e` `7a6f913`):** (1) `/admin` IngestPanel is now **zero-config**
+  — leads with install-only, token demoted to an "Advanced — optional fallback" toggle; (2) **anti-spoof**
+  shipped — `verifyPrExists()` confirms the PR via the org's GitHub App (definitive 404 → reject,
+  **fail-open** on missing install / transient error) on the tokenless path only, plus a best-effort
+  per-IP in-memory rate limit (60/min); (3) **`linkAiToPr` consumes `pr_link_ingest`** as `pr_link`@0.99
+  (folded into the session's pr_refs), with a new integration test proving beacon → 0.99 link.
+  Verified: integration suite 13/13 + 289 unit tests + typecheck all green.
+- **Still open:** **rotate the exposed dev token `pi_fe31…`**; the rate limit is single-instance (shared
+  store = the multi-instance upgrade); the real intcam#3 beacon stays an ORPHAN until the test org's
+  session `d1b46f8f…` is ingested (scan/OTLP) — then it links at 0.99.
 
 ---
 
